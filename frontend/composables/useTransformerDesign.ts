@@ -16,6 +16,7 @@ export interface TransformerRequirements {
     cooling?: 'natural' | 'forced'
     preferred_core_geometry?: string
     preferred_material?: string
+    design_method?: 'auto' | 'ap_mclyman' | 'kg_mclyman' | 'kgfe_erickson'
     max_current_density_A_cm2?: number
     window_utilization_Ku?: number
 }
@@ -88,11 +89,24 @@ export interface VerificationStatus {
     recommendations: string[]
 }
 
+export interface AlternativeCore {
+    part_number: string
+    manufacturer: string
+    geometry: string
+    material: string
+    Ap_cm4: number
+    source: 'local' | 'openmagnetics'
+    datasheet_url?: string | null
+}
+
 export interface TransformerDesignResult {
-    design_method: 'Ap' | 'Kg'
+    design_method: string
+    design_method_name: string
     calculated_Ap_cm4: number
     calculated_Kg_cm5: number | null
+    optimal_Pfe_Pcu_ratio: number | null
     core: CoreSelection
+    alternative_cores: AlternativeCore[]
     winding: WindingDesign
     turns_ratio: number
     magnetizing_inductance_uH: number | null
@@ -142,18 +156,19 @@ export function useTransformerDesign() {
     const suggestions = ref<NoMatchResult | null>(null)
 
     const requirements = ref<TransformerRequirements>({
-        output_power_W: 100,
-        primary_voltage_V: 48,
-        secondary_voltage_V: 12,
-        frequency_Hz: 100000,
+        output_power_W: 2200,
+        primary_voltage_V: 400,
+        secondary_voltage_V: 250,
+        frequency_Hz: 100050,
         efficiency_percent: 90,
         regulation_percent: 5,
         ambient_temp_C: 40,
         max_temp_rise_C: 50,
         cooling: 'natural',
+        design_method: 'kgfe_erickson',
         max_current_density_A_cm2: 400,
         window_utilization_Ku: 0.35,
-        waveform: 'sinusoidal',
+        waveform: 'square',
     })
 
     async function designTransformer() {

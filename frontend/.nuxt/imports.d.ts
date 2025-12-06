@@ -30,5 +30,5 @@ export { requestIdleCallback, cancelIdleCallback } from '#app/compat/idle-callba
 export { setInterval } from '#app/compat/interval';
 export { definePageMeta } from '../node_modules/nuxt/dist/pages/runtime/composables';
 export { defineLazyHydrationComponent } from '#app/composables/lazy-hydration';
-export { useTransformerDesign, TransformerRequirements, CoreSelection, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../composables/useTransformerDesign';
+export { useTransformerDesign, TransformerRequirements, CoreSelection, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../composables/useTransformerDesign';
 export { useNuxtDevTools } from '../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools';

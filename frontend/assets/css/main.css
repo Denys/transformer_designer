@@ -571,3 +571,55 @@ a:hover {
   border-color: rgba(0, 212, 170, 0.5);
   transform: translateX(2px);
 }
+
+/* Alternative core chips */
+.alt-core-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.3rem 0.6rem;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  cursor: default;
+  transition: all var(--transition-fast);
+}
+
+.alt-core-chip:hover {
+  background: var(--color-bg-primary);
+  border-color: rgba(0, 212, 170, 0.3);
+  color: var(--color-text-primary);
+}
+
+.alt-core-clickable {
+  cursor: pointer;
+}
+
+.alt-core-clickable:hover {
+  background: rgba(0, 212, 170, 0.15);
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  transform: scale(1.02);
+}
+
+.alt-core-source {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* Method badge */
+.method-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.5rem;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-accent-secondary);
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-md);
+}

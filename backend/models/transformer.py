@@ -1,6 +1,6 @@
 """
 Pydantic models for transformer design inputs and outputs
-Based on McLyman's Ap/Kg methodology
+Based on McLyman's Ap/Kg and Erickson's Kgfe methodologies
 """
 
 from enum import Enum
@@ -23,6 +23,14 @@ class WaveformType(str, Enum):
     SQUARE = "square"          # Kf = 4.0
     TRIANGULAR = "triangular"  # Kf = 4.0
     PULSE = "pulse"            # Use volt-seconds method
+
+
+class DesignMethod(str, Enum):
+    """Design methodology selection"""
+    AP_MCLYMAN = "ap_mclyman"        # McLyman Area Product - simple, general purpose
+    KG_MCLYMAN = "kg_mclyman"        # McLyman Kg - regulation focused (low freq)
+    KGFE_ERICKSON = "kgfe_erickson"  # Erickson Kgfe - loss optimized (high freq)
+    AUTO = "auto"                    # Automatically select best method
 
 
 class TransformerRequirements(BaseModel):
@@ -51,6 +59,7 @@ class TransformerRequirements(BaseModel):
     transformer_type: TransformerType = Field(default=TransformerType.POWER_HF, description="Transformer type")
     preferred_core_geometry: Optional[str] = Field(default=None, description="Preferred core geometry (EE, ETD, PQ, etc.)")
     preferred_material: Optional[str] = Field(default=None, description="Preferred core material")
+    design_method: DesignMethod = Field(default=DesignMethod.AUTO, description="Design methodology")
     
     # Current density limits
     max_current_density_A_cm2: float = Field(default=400, ge=100, le=800, description="Max current density [A/cm²]")
@@ -160,12 +169,17 @@ class TransformerDesignResult(BaseModel):
     """Complete transformer design output"""
     
     # Design method used
-    design_method: Literal["Ap", "Kg"] = Field(..., description="Design method used")
+    design_method: str = Field(..., description="Design method used (Ap, Kg, Kgfe)")
+    design_method_name: str = Field(default="McLyman Ap", description="Human-readable method name")
     calculated_Ap_cm4: float = Field(..., ge=0, description="Calculated area product [cm⁴]")
     calculated_Kg_cm5: Optional[float] = Field(default=None, description="Calculated core geometry [cm⁵]")
+    optimal_Pfe_Pcu_ratio: Optional[float] = Field(default=None, description="Optimal loss ratio (Erickson)")
     
     # Selected core
     core: CoreSelection
+    
+    # Alternative cores that also meet requirements
+    alternative_cores: List[dict] = Field(default_factory=list, description="Other viable cores")
     
     # Winding design
     winding: WindingDesign

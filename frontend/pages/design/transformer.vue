@@ -80,6 +80,23 @@
                                     <option value="forced">Forced Air</option>
                                 </select>
                             </div>
+
+                            <div class="form-group">
+                                <label class="form-label">
+                                    Design Method
+                                    <span class="help-icon" title="Select core sizing methodology">ⓘ</span>
+                                </label>
+                                <select v-model="requirements.design_method" class="form-input form-select">
+                                    <option value="auto">Auto (Recommended)</option>
+                                    <option value="ap_mclyman">McLyman Ap — General purpose</option>
+                                    <option value="kg_mclyman">McLyman Kg — Low frequency, regulation</option>
+                                    <option value="kgfe_erickson">Erickson Kgfe — Loss optimized (HF)</option>
+                                </select>
+                                <div class="form-hint">
+                                    <strong>Auto:</strong> Best method for your frequency/power |
+                                    <strong>Erickson:</strong> Minimizes total loss for SMPS
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Design Parameters -->
@@ -340,6 +357,24 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Alternative Cores -->
+                            <div v-if="result.alternative_cores && result.alternative_cores.length > 0"
+                                style="margin-top: 1rem; padding: 0.75rem; background: var(--color-bg-secondary); border-radius: var(--radius-md);">
+                                <div style="font-size: 0.8rem; color: var(--color-text-muted); margin-bottom: 0.5rem;">
+                                    💡 Click to use an alternative core:
+                                </div>
+                                <div class="flex gap-2 flex-wrap">
+                                    <button v-for="alt in result.alternative_cores" :key="alt.part_number"
+                                        class="alt-core-chip alt-core-clickable"
+                                        :title="`Click to redesign with ${alt.part_number} | ${alt.manufacturer} | Ap: ${alt.Ap_cm4?.toFixed(2)} cm⁴`"
+                                        @click="selectAlternativeCore(alt)">
+                                        {{ alt.part_number }}
+                                        <span class="alt-core-source">{{ alt.source === 'openmagnetics' ? '🌐' : '📦'
+                                        }}</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Winding Design -->
@@ -353,11 +388,11 @@
                                     <div style="font-weight: 600; margin-bottom: 0.5rem;">Primary</div>
                                     <div style="font-size: 0.85rem; color: var(--color-text-secondary);">
                                         <div>Turns: <strong style="color: var(--color-text-primary);">{{
-                                                result.winding.primary_turns }}</strong></div>
+                                            result.winding.primary_turns }}</strong></div>
                                         <div>Wire: <strong style="color: var(--color-text-primary);">AWG {{
-                                                result.winding.primary_wire_awg }}</strong></div>
+                                            result.winding.primary_wire_awg }}</strong></div>
                                         <div>Rdc: <strong style="color: var(--color-text-primary);">{{
-                                                result.winding.primary_Rdc_mOhm.toFixed(2) }} mΩ</strong></div>
+                                            result.winding.primary_Rdc_mOhm.toFixed(2) }} mΩ</strong></div>
                                     </div>
                                 </div>
                                 <div
@@ -365,11 +400,11 @@
                                     <div style="font-weight: 600; margin-bottom: 0.5rem;">Secondary</div>
                                     <div style="font-size: 0.85rem; color: var(--color-text-secondary);">
                                         <div>Turns: <strong style="color: var(--color-text-primary);">{{
-                                                result.winding.secondary_turns }}</strong></div>
+                                            result.winding.secondary_turns }}</strong></div>
                                         <div>Wire: <strong style="color: var(--color-text-primary);">AWG {{
-                                                result.winding.secondary_wire_awg }}</strong></div>
+                                            result.winding.secondary_wire_awg }}</strong></div>
                                         <div>Rdc: <strong style="color: var(--color-text-primary);">{{
-                                                result.winding.secondary_Rdc_mOhm.toFixed(2) }} mΩ</strong></div>
+                                            result.winding.secondary_Rdc_mOhm.toFixed(2) }} mΩ</strong></div>
                                     </div>
                                 </div>
                             </div>
@@ -471,7 +506,7 @@
 </template>
 
 <script setup lang="ts">
-import { useTransformerDesign, type DesignSuggestion } from '~/composables/useTransformerDesign'
+import { useTransformerDesign, type DesignSuggestion, type AlternativeCore } from '~/composables/useTransformerDesign'
 
 const { requirements, loading, error, result, suggestions, designTransformer, applySuggestion } = useTransformerDesign()
 
@@ -487,6 +522,16 @@ function formatParamName(param: string): string {
 
 async function applySuggestionAndRetry(suggestion: DesignSuggestion) {
     applySuggestion(suggestion)
+    await designTransformer()
+}
+
+async function selectAlternativeCore(alt: AlternativeCore) {
+    // Extract geometry from part number (e.g., "ETD54" -> "ETD", "PQ40/40" -> "PQ")
+    const geometry = alt.geometry || alt.part_number.match(/^[A-Z]+/i)?.[0] || ''
+    if (geometry) {
+        requirements.value.preferred_core_geometry = geometry
+    }
+    // Re-run design - the backend will try to select this core
     await designTransformer()
 }
 </script>

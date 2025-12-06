@@ -3,6 +3,7 @@
 from .transformer import (
     TransformerType,
     WaveformType,
+    DesignMethod,
     TransformerRequirements,
     CoreSelection,
     WindingDesign,
@@ -22,6 +23,7 @@ from .inductor import (
 __all__ = [
     "TransformerType",
     "WaveformType",
+    "DesignMethod",
     "TransformerRequirements",
     "CoreSelection",
     "WindingDesign",
@@ -35,3 +37,4 @@ __all__ = [
     "InductorRequirements",
     "InductorDesignResult",
 ]
+

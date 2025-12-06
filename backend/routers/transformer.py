@@ -623,11 +623,34 @@ async def design_transformer(requirements: TransformerRequirements):
         design_viable = len(errors) == 0
         confidence_score = 0.9 if design_viable and len(warnings) == 0 else (0.7 if design_viable else 0.3)
         
+        # Get alternative cores (up to 3 others that also work)
+        alternative_cores = []
+        for alt_core in suitable_cores[1:4]:  # Skip first (selected), take next 3
+            alternative_cores.append({
+                "part_number": alt_core.get("part_number"),
+                "manufacturer": alt_core.get("manufacturer"),
+                "geometry": alt_core.get("geometry"),
+                "material": alt_core.get("material", "N87"),
+                "Ap_cm4": alt_core.get("Ap_cm4"),
+                "source": alt_core.get("source", "local"),
+                "datasheet_url": alt_core.get("datasheet_url"),
+            })
+        
+        # Method names for display
+        method_names = {
+            "Ap": "McLyman Ap (Area Product)",
+            "Kg": "McLyman Kg (Regulation)",
+            "Kgfe": "Erickson Kgfe (Loss Optimized)",
+        }
+        
         return TransformerDesignResult(
             design_method=design_method,
+            design_method_name=method_names.get(design_method, "McLyman Ap"),
             calculated_Ap_cm4=Ap,
             calculated_Kg_cm5=Kg,
+            optimal_Pfe_Pcu_ratio=1.375 if design_method == "Kgfe" else None,  # β/2 for β=2.75
             core=core,
+            alternative_cores=alternative_cores,
             winding=winding,
             turns_ratio=actual_ratio,
             magnetizing_inductance_uH=None,  # Could calculate if needed

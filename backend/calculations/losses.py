@@ -36,41 +36,48 @@ def calculate_core_loss_steinmetz(
     """
     # Steinmetz coefficients by material
     # Format: (k, alpha, beta) where Pv = k × f^α × B^β [mW/cm³]
-    # IMPORTANT: f in kHz, B in mT (not T!)
-    # Values from manufacturer datasheets at 100°C
+    # f in kHz, B in mT
+    # 
+    # CALIBRATION CHECK: For N87 at 100kHz, 100mT → should be ~300-400 mW/cm³
+    # k × 100^1.46 × 100^2.75 = k × 831 × 177828 = k × 1.48e8
+    # For Pv=350 mW/cm³: k = 350 / 1.48e8 = 2.4e-6
+    #
     steinmetz_params = {
         # Ferroxcube 3C series (100°C, 100kHz reference)
-        "3c": (3.2, 1.46, 2.75),           # 3C90/3C92/3C95 family
-        "3c90": (4.0, 1.46, 2.75),         # Ferroxcube 3C90
-        "3c92": (3.5, 1.46, 2.75),         # Ferroxcube 3C92
-        "3c94": (2.8, 1.46, 2.75),         # Ferroxcube 3C94
-        "3c95": (2.5, 1.46, 2.75),         # Ferroxcube 3C95 (low loss)
+        # 3C90 at 100kHz, 100mT → ~200 mW/cm³
+        "3c": (1.3e-6, 1.46, 2.75),
+        "3c90": (1.5e-6, 1.46, 2.75),
+        "3c92": (1.3e-6, 1.46, 2.75),
+        "3c94": (1.0e-6, 1.46, 2.75),
+        "3c95": (0.8e-6, 1.46, 2.75),      # Low loss grade
         
         # TDK N series (100°C reference)
-        "n87": (7.7, 1.46, 2.75),          # TDK N87
-        "n97": (5.0, 1.46, 2.75),          # TDK N97 (lower loss)
-        "n49": (10.0, 1.50, 2.80),         # TDK N49 (higher frequency)
+        # N87 at 100kHz, 100mT → ~350 mW/cm³
+        "n87": (2.4e-6, 1.46, 2.75),
+        "n97": (1.8e-6, 1.46, 2.75),
+        "n49": (3.0e-6, 1.50, 2.80),
         
-        # Generic ferrite (use 3C95-like low loss)
-        "ferrite": (3.5, 1.46, 2.75),
+        # Generic ferrite (conservative)
+        "ferrite": (2.0e-6, 1.46, 2.75),
         
         # High frequency ferrite 
-        "3f3": (6.0, 1.50, 2.80),
-        "3f35": (5.0, 1.48, 2.75),
+        "3f3": (2.5e-6, 1.50, 2.80),
+        "3f35": (2.0e-6, 1.48, 2.75),
         
-        # Silicon steel (50/60 Hz reference) - different units
-        "silicon_steel": (0.8, 1.5, 2.0),  # f in kHz, B in mT
-        "m6": (0.7, 1.5, 2.0),             # M6 grain-oriented
-        "m19": (1.0, 1.6, 2.0),            # Non-oriented
+        # Silicon steel (50/60 Hz) - normalized for kHz/mT
+        # M6 at 60Hz, 1.5T → ~1 W/kg, for 7.65 g/cm³ → ~7.65 mW/cm³
+        "silicon_steel": (0.5e-3, 1.5, 2.0),
+        "m6": (0.4e-3, 1.5, 2.0),
+        "m19": (0.6e-3, 1.6, 2.0),
         
         # Amorphous
-        "amorphous": (0.3, 1.5, 2.1),
-        "2605sa1": (0.25, 1.5, 2.1),
+        "amorphous": (1.5e-6, 1.5, 2.1),
+        "2605sa1": (1.2e-6, 1.5, 2.1),
         
-        # Powder cores
-        "powder": (2.0, 1.2, 2.0),
-        "mpp": (1.5, 1.2, 2.0),
-        "kool_mu": (2.5, 1.3, 2.0),
+        # Powder cores (higher loss)
+        "powder": (8e-6, 1.2, 2.0),
+        "mpp": (6e-6, 1.2, 2.0),
+        "kool_mu": (10e-6, 1.3, 2.0),
     }
     
     # Normalize material name
