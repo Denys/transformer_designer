@@ -194,6 +194,9 @@ class TransformerDesignResult(BaseModel):
     thermal: ThermalAnalysis
     verification: VerificationStatus
     
+    # Validation against reference data
+    validation: Optional[dict] = Field(default=None, description="Calculation validation results")
+    
     # Summary
     design_viable: bool = Field(..., description="Is the design viable?")
     confidence_score: float = Field(..., ge=0, le=1, description="Design confidence score")

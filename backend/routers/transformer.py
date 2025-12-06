@@ -50,6 +50,12 @@ from calculations.thermal import (
     calculate_surface_area,
     thermal_analysis,
 )
+from calculations.validation import (
+    validate_core_loss,
+    validate_efficiency,
+    validate_temperature_rise,
+    run_full_validation,
+)
 
 router = APIRouter(prefix="/api", tags=["Transformer Design"])
 
@@ -643,6 +649,59 @@ async def design_transformer(requirements: TransformerRequirements):
             "Kgfe": "Erickson Kgfe (Loss Optimized)",
         }
         
+        # Run validation against reference data
+        validation_results = {}
+        
+        # Core loss validation
+        core_loss_val = validate_core_loss(
+            our_loss_W=core_loss_W,
+            volume_cm3=core.Ve_cm3,
+            frequency_Hz=requirements.frequency_Hz,
+            Bac_T=Bmax / 2,
+            material=material_grade,
+            temperature_C=requirements.ambient_temp_C + thermal_data["temperature_rise_C"] / 2,
+        )
+        validation_results["core_loss"] = {
+            "our_value": round(core_loss_val.our_value, 2),
+            "reference_value": round(core_loss_val.reference_value, 2),
+            "difference_percent": round(core_loss_val.difference_percent, 1),
+            "status": core_loss_val.status,
+            "confidence": core_loss_val.confidence,
+            "unit": "mW/cm³",
+        }
+        
+        # Efficiency validation
+        eff_val = validate_efficiency(
+            calculated_efficiency=efficiency,
+            output_power_W=requirements.output_power_W,
+            frequency_Hz=requirements.frequency_Hz,
+            core_volume_cm3=core.Ve_cm3,
+        )
+        validation_results["efficiency"] = {
+            "our_value": round(eff_val.our_value, 1),
+            "reference_value": round(eff_val.reference_value, 1),
+            "difference_percent": round(eff_val.difference_percent, 1),
+            "status": eff_val.status,
+            "confidence": eff_val.confidence,
+            "unit": "%",
+        }
+        
+        # Temperature rise validation
+        temp_val = validate_temperature_rise(
+            calculated_rise_C=thermal_data["temperature_rise_C"],
+            power_dissipation_W=total_loss_data["total_loss_W"],
+            surface_area_cm2=core.At_cm2,
+            cooling=requirements.cooling,
+        )
+        validation_results["temperature_rise"] = {
+            "our_value": round(temp_val.our_value, 1),
+            "reference_value": round(temp_val.reference_value, 1),
+            "difference_percent": round(temp_val.difference_percent, 1),
+            "status": temp_val.status,
+            "confidence": temp_val.confidence,
+            "unit": "°C",
+        }
+        
         return TransformerDesignResult(
             design_method=design_method,
             design_method_name=method_names.get(design_method, "McLyman Ap"),
@@ -658,6 +717,7 @@ async def design_transformer(requirements: TransformerRequirements):
             losses=losses,
             thermal=thermal,
             verification=verification,
+            validation=validation_results,
             design_viable=design_viable,
             confidence_score=confidence_score,
         )
@@ -711,3 +771,64 @@ async def list_materials(material_type: Optional[str] = None):
             raise HTTPException(status_code=404, detail=f"Material type '{material_type}' not found")
     
     return materials
+
+
+@router.post("/validate/core-loss")
+async def validate_core_loss_endpoint(
+    core_loss_W: float,
+    volume_cm3: float,
+    frequency_Hz: float,
+    Bac_T: float,
+    material: str = "ferrite",
+    temperature_C: float = 100,
+):
+    """
+    Validate a core loss calculation against reference data.
+    
+    Returns comparison with manufacturer datasheet values and industry benchmarks.
+    """
+    result = validate_core_loss(
+        our_loss_W=core_loss_W,
+        volume_cm3=volume_cm3,
+        frequency_Hz=frequency_Hz,
+        Bac_T=Bac_T,
+        material=material,
+        temperature_C=temperature_C,
+    )
+    
+    return {
+        "our_value_mW_cm3": result.our_value,
+        "reference_value_mW_cm3": result.reference_value,
+        "difference_percent": round(result.difference_percent, 1),
+        "status": result.status,
+        "method": result.method,
+        "notes": result.notes,
+    }
+
+
+@router.post("/validate/design")
+async def validate_design_endpoint(
+    design_result: dict,
+    requirements: TransformerRequirements,
+):
+    """
+    Run full validation suite on a transformer design.
+    
+    Validates core loss, efficiency, and temperature rise against reference data.
+    """
+    req_dict = requirements.model_dump()
+    
+    validations = run_full_validation(design_result, req_dict)
+    
+    return {
+        name: {
+            "our_value": v.our_value,
+            "reference_value": v.reference_value,
+            "difference_percent": round(v.difference_percent, 1),
+            "status": v.status,
+            "method": v.method,
+            "notes": v.notes,
+        }
+        for name, v in validations.items()
+    }
+

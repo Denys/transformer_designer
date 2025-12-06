@@ -371,7 +371,7 @@
                                         @click="selectAlternativeCore(alt)">
                                         {{ alt.part_number }}
                                         <span class="alt-core-source">{{ alt.source === 'openmagnetics' ? '🌐' : '📦'
-                                        }}</span>
+                                            }}</span>
                                     </button>
                                 </div>
                             </div>
@@ -498,6 +498,47 @@
                                 </ul>
                             </div>
                         </div>
+
+                        <!-- Calculation Validation -->
+                        <div v-if="result.validation" class="mt-6">
+                            <h4 style="font-size: 0.9rem; color: var(--color-accent-primary); margin-bottom: 0.75rem;">
+                                ✅ Calculation Validation
+                            </h4>
+                            <div
+                                style="padding: 1rem; background: var(--color-bg-tertiary); border-radius: var(--radius-md);">
+                                <div
+                                    style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 0.75rem;">
+                                    Compared against manufacturer datasheets and industry benchmarks
+                                </div>
+                                <div class="grid grid-3 gap-3">
+                                    <div v-for="(val, key) in result.validation" :key="key" class="validation-item"
+                                        :class="'validation-' + val.status">
+                                        <div class="validation-label">
+                                            {{ formatValidationKey(key) }}
+                                            <span v-if="val.confidence === 'high'" class="confidence-high"
+                                                title="High confidence - close to reference data">●</span>
+                                            <span v-else-if="val.confidence === 'medium'" class="confidence-medium"
+                                                title="Medium confidence - interpolated">◐</span>
+                                            <span v-else class="confidence-low"
+                                                title="Low confidence - extrapolated">○</span>
+                                        </div>
+                                        <div class="validation-values">
+                                            <span class="validation-our">{{ val.our_value }} {{ val.unit }}</span>
+                                            <span class="validation-vs">vs</span>
+                                            <span class="validation-ref">{{ val.reference_value }} {{ val.unit }}</span>
+                                        </div>
+                                        <div class="validation-status">
+                                            <span v-if="val.status === 'pass'" class="status-pass">✓ Match</span>
+                                            <span v-else-if="val.status === 'warning'" class="status-warning">≈
+                                                Close</span>
+                                            <span v-else-if="val.status === 'fail'" class="status-fail">✗ Check</span>
+                                            <span v-else class="status-unknown">? N/A</span>
+                                            <span class="validation-diff">({{ val.difference_percent }}%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -533,5 +574,14 @@ async function selectAlternativeCore(alt: AlternativeCore) {
     }
     // Re-run design - the backend will try to select this core
     await designTransformer()
+}
+
+function formatValidationKey(key: string): string {
+    const names: Record<string, string> = {
+        core_loss: 'Core Loss',
+        efficiency: 'Efficiency',
+        temperature_rise: 'Temp Rise',
+    }
+    return names[key] || key.replace(/_/g, ' ')
 }
 </script>

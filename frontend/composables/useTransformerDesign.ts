@@ -99,6 +99,15 @@ export interface AlternativeCore {
     datasheet_url?: string | null
 }
 
+export interface ValidationItem {
+    our_value: number
+    reference_value: number
+    difference_percent: number
+    status: 'pass' | 'warning' | 'fail' | 'unknown'
+    confidence: 'high' | 'medium' | 'low'
+    unit: string
+}
+
 export interface TransformerDesignResult {
     design_method: string
     design_method_name: string
@@ -114,6 +123,7 @@ export interface TransformerDesignResult {
     losses: LossAnalysis
     thermal: ThermalAnalysis
     verification: VerificationStatus
+    validation: Record<string, ValidationItem> | null
     design_viable: boolean
     confidence_score: number
 }

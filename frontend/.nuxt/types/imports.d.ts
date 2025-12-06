@@ -183,7 +183,7 @@ declare global {
   export type { Component, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { TransformerRequirements, CoreSelection, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../../composables/useTransformerDesign'
+  export type { TransformerRequirements, CoreSelection, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, ValidationItem, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../../composables/useTransformerDesign'
   import('../../composables/useTransformerDesign')
 }
 // for vue template auto import
