@@ -10,6 +10,12 @@ from .kg_method import (
     calculate_electrical_coefficient,
     calculate_core_geometry,
 )
+from .erickson_method import (
+    calculate_Kg_erickson,
+    calculate_Kgfe_erickson,
+    design_transformer_erickson,
+    optimal_Bac_for_minimum_loss,
+)
 from .winding import (
     calculate_turns,
     calculate_wire_area,
@@ -36,9 +42,14 @@ __all__ = [
     "calculate_area_product",
     "calculate_area_product_inductor",
     "waveform_coefficient",
-    # kg_method
+    # kg_method (McLyman)
     "calculate_electrical_coefficient",
     "calculate_core_geometry",
+    # erickson_method
+    "calculate_Kg_erickson",
+    "calculate_Kgfe_erickson",
+    "design_transformer_erickson",
+    "optimal_Bac_for_minimum_loss",
     # winding
     "calculate_turns",
     "calculate_wire_area",
@@ -56,3 +67,4 @@ __all__ = [
     "calculate_power_dissipation_density",
     "calculate_temperature_rise",
 ]
+
