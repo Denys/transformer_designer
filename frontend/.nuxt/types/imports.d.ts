@@ -33,6 +33,9 @@ declare global {
   const hasInjectionContext: typeof import('vue').hasInjectionContext
   const inject: typeof import('vue').inject
   const injectHead: typeof import('../../node_modules/nuxt/dist/app/composables/head').injectHead
+  const isDesignResult: typeof import('../../composables/useTransformerDesign').isDesignResult
+  const isLitzWire: typeof import('../../composables/useTransformerDesign').isLitzWire
+  const isNoMatchResult: typeof import('../../composables/useTransformerDesign').isNoMatchResult
   const isNuxtError: typeof import('../../node_modules/nuxt/dist/app/composables/error').isNuxtError
   const isPrerendered: typeof import('../../node_modules/nuxt/dist/app/composables/payload').isPrerendered
   const isProxy: typeof import('vue').isProxy
@@ -101,6 +104,7 @@ declare global {
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
   const useError: typeof import('../../node_modules/nuxt/dist/app/composables/error').useError
+  const useExport: typeof import('../../composables/useExport').useExport
   const useFetch: typeof import('../../node_modules/nuxt/dist/app/composables/fetch').useFetch
   const useHead: typeof import('../../node_modules/nuxt/dist/app/composables/head').useHead
   const useHeadSafe: typeof import('../../node_modules/nuxt/dist/app/composables/head').useHeadSafe
@@ -114,6 +118,7 @@ declare global {
   const useNuxtApp: typeof import('../../node_modules/nuxt/dist/app/nuxt').useNuxtApp
   const useNuxtData: typeof import('../../node_modules/nuxt/dist/app/composables/asyncData').useNuxtData
   const useNuxtDevTools: typeof import('../../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools').useNuxtDevTools
+  const useOpenMagnetics: typeof import('../../composables/useOpenMagnetics').useOpenMagnetics
   const usePreviewMode: typeof import('../../node_modules/nuxt/dist/app/composables/preview').usePreviewMode
   const useRequestEvent: typeof import('../../node_modules/nuxt/dist/app/composables/ssr').useRequestEvent
   const useRequestFetch: typeof import('../../node_modules/nuxt/dist/app/composables/ssr').useRequestFetch
@@ -183,7 +188,13 @@ declare global {
   export type { Component, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { TransformerRequirements, CoreSelection, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, ValidationItem, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../../composables/useTransformerDesign'
+  export type { ExportFormat, ExportFormatInfo, MASExportResponse, FEMMExportResponse } from '../../composables/useExport'
+  import('../../composables/useExport')
+  // @ts-ignore
+  export type { OpenMagneticsCore, CoreWithLoss, MaterialProperties, CoreLossCalculation, DatabaseSummary, CoreSearchParams, LossBasedSearchParams } from '../../composables/useOpenMagnetics'
+  import('../../composables/useOpenMagnetics')
+  // @ts-ignore
+  export type { TransformerType, WaveformType, DesignMethodType, CoolingType, StatusType, ConfidenceLevel, WireType, CoreSource, TransformerRequirements, CoreSelection, LitzWireSpec, SolidWireSpec, WireSpec, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, ValidationItem, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../../composables/useTransformerDesign'
   import('../../composables/useTransformerDesign')
 }
 // for vue template auto import
@@ -222,6 +233,9 @@ declare module 'vue' {
     readonly hasInjectionContext: UnwrapRef<typeof import('vue')['hasInjectionContext']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectHead: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/head')['injectHead']>
+    readonly isDesignResult: UnwrapRef<typeof import('../../composables/useTransformerDesign')['isDesignResult']>
+    readonly isLitzWire: UnwrapRef<typeof import('../../composables/useTransformerDesign')['isLitzWire']>
+    readonly isNoMatchResult: UnwrapRef<typeof import('../../composables/useTransformerDesign')['isNoMatchResult']>
     readonly isNuxtError: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/error')['isNuxtError']>
     readonly isPrerendered: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/payload')['isPrerendered']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
@@ -290,6 +304,7 @@ declare module 'vue' {
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
     readonly useError: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/error')['useError']>
+    readonly useExport: UnwrapRef<typeof import('../../composables/useExport')['useExport']>
     readonly useFetch: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/fetch')['useFetch']>
     readonly useHead: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/head')['useHead']>
     readonly useHeadSafe: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/head')['useHeadSafe']>
@@ -303,6 +318,7 @@ declare module 'vue' {
     readonly useNuxtApp: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/nuxt')['useNuxtApp']>
     readonly useNuxtData: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/asyncData')['useNuxtData']>
     readonly useNuxtDevTools: UnwrapRef<typeof import('../../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools')['useNuxtDevTools']>
+    readonly useOpenMagnetics: UnwrapRef<typeof import('../../composables/useOpenMagnetics')['useOpenMagnetics']>
     readonly usePreviewMode: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/preview')['usePreviewMode']>
     readonly useRequestEvent: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/ssr')['useRequestEvent']>
     readonly useRequestFetch: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/ssr')['useRequestFetch']>

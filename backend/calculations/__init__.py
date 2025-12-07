@@ -24,6 +24,8 @@ from .winding import (
     calculate_skin_depth,
     calculate_dc_resistance,
     calculate_ac_resistance_factor,
+    recommend_litz_wire,
+    select_wire_for_frequency,
 )
 from .losses import (
     calculate_core_loss_steinmetz,
@@ -34,6 +36,14 @@ from .thermal import (
     calculate_surface_area,
     calculate_power_dissipation_density,
     calculate_temperature_rise,
+)
+from .cross_validation import (
+    TransformerValidator,
+    CrossValidationReport,
+    ValidationResult,
+    ValidationStatus,
+    ConfidenceLevel,
+    create_validation_dict,
 )
 
 __all__ = [
@@ -58,6 +68,8 @@ __all__ = [
     "calculate_skin_depth",
     "calculate_dc_resistance",
     "calculate_ac_resistance_factor",
+    "recommend_litz_wire",
+    "select_wire_for_frequency",
     # losses
     "calculate_core_loss_steinmetz",
     "calculate_copper_loss",
@@ -66,5 +78,12 @@ __all__ = [
     "calculate_surface_area",
     "calculate_power_dissipation_density",
     "calculate_temperature_rise",
+    # cross_validation
+    "TransformerValidator",
+    "CrossValidationReport",
+    "ValidationResult",
+    "ValidationStatus",
+    "ConfidenceLevel",
+    "create_validation_dict",
 ]
 

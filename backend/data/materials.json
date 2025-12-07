@@ -3,6 +3,7 @@
         "N87": {
             "manufacturer": "TDK",
             "type": "MnZn ferrite",
+            "description": "Standard power ferrite, excellent for 25-500 kHz SMPS",
             "Bsat_T": 0.39,
             "Bsat_temp_C": 100,
             "mu_i": 2200,
@@ -10,112 +11,274 @@
             "resistivity_Ohm_m": 10,
             "density_g_cm3": 4.85,
             "curie_temp_C": 210,
-            "temp_range_C": [
-                -40,
-                120
-            ],
-            "steinmetz_k": 1.1e-3,
-            "steinmetz_alpha": 1.3,
-            "steinmetz_beta": 2.5,
-            "loss_mW_cm3_100kHz_100mT": 80,
-            "loss_mW_cm3_100kHz_200mT": 350,
-            "frequency_range_Hz": [
-                1000,
-                500000
-            ],
+            "temp_range_C": [-40, 120],
+            "steinmetz": {
+                "k": 8.1e-7,
+                "alpha": 1.46,
+                "beta": 2.75,
+                "reference_conditions": "100kHz, 100mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.65,
+                    "40": 0.70,
+                    "60": 0.80,
+                    "80": 0.90,
+                    "100": 1.00,
+                    "120": 1.20
+                },
+                "frequency_exponent_variation": {
+                    "25kHz": 1.40,
+                    "100kHz": 1.46,
+                    "300kHz": 1.52,
+                    "500kHz": 1.58
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "25kHz_100mT_100C": 20,
+                "50kHz_100mT_100C": 45,
+                "100kHz_100mT_100C": 120,
+                "100kHz_200mT_100C": 800,
+                "200kHz_100mT_100C": 350,
+                "300kHz_50mT_100C": 110
+            },
+            "frequency_range_Hz": [1000, 500000],
             "typical_applications": [
-                "SMPS transformers",
-                "power inductors"
+                "SMPS transformers 100W-10kW",
+                "Power inductors",
+                "LLC resonant converters"
             ],
-            "notes": "Excellent for 50-200 kHz power applications"
+            "power_range_note": "Excellent for 1kW+ PE converters at 50-200kHz",
+            "notes": "Industry standard for SMPS. Loss minimum around 80-100°C."
         },
         "N97": {
             "manufacturer": "TDK",
             "type": "MnZn ferrite",
+            "description": "Low loss power ferrite for high efficiency applications",
             "Bsat_T": 0.41,
             "Bsat_temp_C": 100,
             "mu_i": 2300,
             "resistivity_Ohm_m": 6,
             "density_g_cm3": 4.85,
             "curie_temp_C": 215,
-            "temp_range_C": [
-                -40,
-                115
-            ],
-            "steinmetz_k": 0.9e-3,
-            "steinmetz_alpha": 1.25,
-            "steinmetz_beta": 2.4,
-            "loss_mW_cm3_100kHz_100mT": 60,
-            "loss_mW_cm3_100kHz_200mT": 280,
-            "frequency_range_Hz": [
-                1000,
-                500000
-            ],
+            "temp_range_C": [-40, 115],
+            "steinmetz": {
+                "k": 6.1e-7,
+                "alpha": 1.46,
+                "beta": 2.75,
+                "reference_conditions": "100kHz, 100mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.70,
+                    "60": 0.85,
+                    "80": 0.95,
+                    "100": 1.00,
+                    "115": 1.15
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "100kHz_100mT_100C": 90,
+                "100kHz_200mT_100C": 600,
+                "200kHz_100mT_100C": 280
+            },
+            "frequency_range_Hz": [1000, 500000],
             "typical_applications": [
-                "High efficiency SMPS"
+                "High efficiency SMPS",
+                "Server power supplies",
+                "EV chargers"
             ],
-            "notes": "Lower loss than N87, good for high efficiency"
+            "power_range_note": "Preferred for >1kW high efficiency designs",
+            "notes": "~25% lower loss than N87. Optimized for 80-100°C operation."
+        },
+        "N49": {
+            "manufacturer": "TDK",
+            "type": "MnZn ferrite",
+            "description": "High frequency ferrite for 200kHz-1MHz",
+            "Bsat_T": 0.37,
+            "Bsat_temp_C": 100,
+            "mu_i": 1500,
+            "resistivity_Ohm_m": 10,
+            "density_g_cm3": 4.80,
+            "curie_temp_C": 215,
+            "temp_range_C": [-40, 140],
+            "steinmetz": {
+                "k": 2.5e-7,
+                "alpha": 1.50,
+                "beta": 2.80,
+                "reference_conditions": "300kHz, 50mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.80,
+                    "60": 0.90,
+                    "100": 1.00,
+                    "120": 1.10,
+                    "140": 1.25
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "100kHz_100mT_100C": 160,
+                "300kHz_50mT_100C": 45,
+                "500kHz_50mT_100C": 100,
+                "1000kHz_25mT_100C": 80
+            },
+            "frequency_range_Hz": [100000, 2000000],
+            "typical_applications": [
+                "High frequency SMPS",
+                "Resonant converters",
+                "GaN/SiC based designs"
+            ],
+            "power_range_note": "Use for MHz-range switching",
+            "notes": "Lower permeability improves high-frequency performance."
+        },
+        "PC95": {
+            "manufacturer": "TDK",
+            "type": "MnZn ferrite",
+            "description": "Lowest loss TDK power material",
+            "Bsat_T": 0.38,
+            "Bsat_temp_C": 100,
+            "mu_i": 3000,
+            "resistivity_Ohm_m": 5,
+            "density_g_cm3": 4.85,
+            "curie_temp_C": 220,
+            "temp_range_C": [-40, 120],
+            "steinmetz": {
+                "k": 4.5e-7,
+                "alpha": 1.45,
+                "beta": 2.70,
+                "reference_conditions": "100kHz, 100mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.75,
+                    "60": 0.85,
+                    "80": 0.92,
+                    "100": 1.00,
+                    "120": 1.15
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "100kHz_100mT_100C": 64,
+                "100kHz_200mT_100C": 420
+            },
+            "frequency_range_Hz": [1000, 400000],
+            "typical_applications": [
+                "Premium efficiency SMPS",
+                "Solar inverters",
+                "Data center PSUs"
+            ],
+            "power_range_note": "Best TDK choice for highest efficiency >1kW",
+            "notes": "Premium grade, ~45% lower loss than N87"
         },
         "3C95": {
             "manufacturer": "Ferroxcube",
             "type": "MnZn ferrite",
+            "description": "Power ferrite with low loss at elevated temperatures",
             "Bsat_T": 0.41,
             "Bsat_temp_C": 100,
             "mu_i": 3000,
             "resistivity_Ohm_m": 5,
             "density_g_cm3": 4.80,
             "curie_temp_C": 215,
-            "temp_range_C": [
-                -40,
-                120
-            ],
-            "steinmetz_k": 1.2e-3,
-            "steinmetz_alpha": 1.25,
-            "steinmetz_beta": 2.4,
-            "loss_mW_cm3_100kHz_100mT": 70,
-            "loss_mW_cm3_100kHz_200mT": 310,
-            "frequency_range_Hz": [
-                1000,
-                400000
-            ],
+            "temp_range_C": [-40, 120],
+            "steinmetz": {
+                "k": 4.1e-7,
+                "alpha": 1.46,
+                "beta": 2.75,
+                "reference_conditions": "100kHz, 100mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.80,
+                    "60": 0.90,
+                    "80": 0.95,
+                    "100": 1.00,
+                    "120": 1.10
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "100kHz_100mT_100C": 60,
+                "100kHz_200mT_100C": 400
+            },
+            "frequency_range_Hz": [1000, 400000],
             "typical_applications": [
                 "SMPS",
-                "DC-DC converters"
+                "DC-DC converters",
+                "Power inductors"
             ],
+            "power_range_note": "Good for 500W-5kW designs",
             "notes": "Optimized for 80-120°C operation"
+        },
+        "3C90": {
+            "manufacturer": "Ferroxcube",
+            "type": "MnZn ferrite",
+            "description": "General purpose power ferrite",
+            "Bsat_T": 0.38,
+            "Bsat_temp_C": 100,
+            "mu_i": 2300,
+            "resistivity_Ohm_m": 5,
+            "density_g_cm3": 4.80,
+            "curie_temp_C": 200,
+            "temp_range_C": [-40, 120],
+            "steinmetz": {
+                "k": 6.8e-7,
+                "alpha": 1.46,
+                "beta": 2.75,
+                "reference_conditions": "100kHz, 100mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.70,
+                    "60": 0.82,
+                    "80": 0.92,
+                    "100": 1.00,
+                    "120": 1.18
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "100kHz_100mT_100C": 100,
+                "100kHz_200mT_100C": 650
+            },
+            "frequency_range_Hz": [1000, 400000],
+            "typical_applications": [
+                "General SMPS",
+                "Cost-effective designs"
+            ],
+            "power_range_note": "Cost-effective for 100W-2kW",
+            "notes": "Standard grade - balance of performance and cost"
         },
         "3F3": {
             "manufacturer": "Ferroxcube",
             "type": "MnZn ferrite",
+            "description": "High frequency power ferrite for 200kHz-2MHz",
             "Bsat_T": 0.38,
             "Bsat_temp_C": 100,
             "mu_i": 2000,
             "resistivity_Ohm_m": 2,
             "density_g_cm3": 4.80,
             "curie_temp_C": 200,
-            "temp_range_C": [
-                -40,
-                120
-            ],
-            "steinmetz_k": 2.0e-3,
-            "steinmetz_alpha": 1.4,
-            "steinmetz_beta": 2.6,
-            "loss_mW_cm3_300kHz_50mT": 60,
-            "loss_mW_cm3_500kHz_50mT": 150,
-            "frequency_range_Hz": [
-                100000,
-                2000000
-            ],
+            "temp_range_C": [-40, 120],
+            "steinmetz": {
+                "k": 8.1e-7,
+                "alpha": 1.50,
+                "beta": 2.80,
+                "reference_conditions": "300kHz, 50mT, 100°C",
+                "temp_coefficients": {
+                    "25": 0.85,
+                    "60": 0.92,
+                    "100": 1.00,
+                    "120": 1.12
+                }
+            },
+            "loss_reference_points_mW_cm3": {
+                "300kHz_50mT_100C": 60,
+                "500kHz_50mT_100C": 150,
+                "1000kHz_25mT_100C": 100
+            },
+            "frequency_range_Hz": [100000, 2000000],
             "typical_applications": [
                 "High frequency SMPS",
-                "resonant converters"
+                "Resonant converters",
+                "Small form factor PSUs"
             ],
+            "power_range_note": "For MHz switching frequencies",
             "notes": "Optimized for 200kHz-1MHz range"
         }
     },
     "silicon_steel": {
         "M6": {
+            "manufacturer": "Various (AK Steel, Nippon Steel, etc.)",
             "type": "Grain-oriented silicon steel",
+            "description": "Premium GOES for line frequency transformers",
             "Bsat_T": 1.8,
             "Bmax_recommended_T": 1.5,
             "mu_i": 1500,
@@ -124,144 +287,349 @@
             "density_g_cm3": 7.65,
             "curie_temp_C": 746,
             "temp_max_C": 150,
-            "steinmetz_k": 0.0109,
-            "steinmetz_alpha": 1.68,
-            "steinmetz_beta": 2.0,
-            "loss_W_kg_60Hz_1T": 0.8,
-            "loss_W_kg_60Hz_1_5T": 1.5,
-            "lamination_thickness_mm": [
-                0.18,
-                0.27,
-                0.35
-            ],
+            "steinmetz": {
+                "k": 2.0e-6,
+                "alpha": 1.5,
+                "beta": 2.0,
+                "reference_conditions": "60Hz, 1.5T, ambient",
+                "temp_coefficients": {
+                    "25": 1.00,
+                    "75": 0.95,
+                    "100": 0.92,
+                    "150": 0.88
+                }
+            },
+            "loss_reference_points_W_kg": {
+                "50Hz_1.0T": 0.70,
+                "50Hz_1.5T": 1.30,
+                "60Hz_1.0T": 0.80,
+                "60Hz_1.5T": 1.50,
+                "400Hz_0.5T": 3.50
+            },
+            "lamination_thickness_mm": [0.18, 0.27, 0.35],
             "stacking_factor": 0.95,
-            "frequency_range_Hz": [
-                50,
-                400
-            ],
+            "frequency_range_Hz": [50, 400],
             "typical_applications": [
-                "Line frequency transformers",
-                "audio"
+                "Distribution transformers",
+                "Audio output transformers",
+                "Industrial control transformers"
             ],
-            "notes": "Best for 50/60Hz power transformers"
+            "power_range_note": "Ideal for 200-500VA 50/60Hz transformers",
+            "notes": "Best for 50/60Hz power transformers. Use 0.18mm laminations for 400Hz."
+        },
+        "M15": {
+            "manufacturer": "Various",
+            "type": "Grain-oriented silicon steel",
+            "description": "Standard GOES, good balance of cost and performance",
+            "Bsat_T": 1.8,
+            "Bmax_recommended_T": 1.5,
+            "mu_i": 1200,
+            "resistivity_uOhm_cm": 52,
+            "density_g_cm3": 7.65,
+            "temp_max_C": 150,
+            "steinmetz": {
+                "k": 2.8e-6,
+                "alpha": 1.5,
+                "beta": 2.0,
+                "reference_conditions": "60Hz, 1.5T, ambient",
+                "temp_coefficients": {
+                    "25": 1.00,
+                    "75": 0.96,
+                    "100": 0.93,
+                    "150": 0.90
+                }
+            },
+            "loss_reference_points_W_kg": {
+                "50Hz_1.0T": 0.90,
+                "50Hz_1.5T": 1.70,
+                "60Hz_1.0T": 1.00,
+                "60Hz_1.5T": 1.90
+            },
+            "lamination_thickness_mm": [0.27, 0.35],
+            "stacking_factor": 0.93,
+            "frequency_range_Hz": [50, 200],
+            "typical_applications": [
+                "Industrial transformers",
+                "Lighting ballasts"
+            ],
+            "power_range_note": "Good for 100-1000VA 50/60Hz",
+            "notes": "Cost-effective alternative to M6"
         },
         "M19": {
+            "manufacturer": "Various",
             "type": "Non-oriented silicon steel",
+            "description": "Standard NOES for motors and general purpose",
             "Bsat_T": 1.7,
             "Bmax_recommended_T": 1.4,
             "mu_i": 500,
             "resistivity_uOhm_cm": 52,
             "density_g_cm3": 7.65,
             "temp_max_C": 150,
-            "steinmetz_k": 0.02,
-            "steinmetz_alpha": 1.6,
-            "steinmetz_beta": 2.0,
-            "loss_W_kg_60Hz_1T": 2.0,
-            "loss_W_kg_60Hz_1_5T": 4.5,
-            "lamination_thickness_mm": [
-                0.35,
-                0.50
-            ],
+            "steinmetz": {
+                "k": 3.0e-6,
+                "alpha": 1.6,
+                "beta": 2.0,
+                "reference_conditions": "60Hz, 1.5T, ambient",
+                "temp_coefficients": {
+                    "25": 1.00,
+                    "75": 0.97,
+                    "100": 0.94,
+                    "150": 0.91
+                }
+            },
+            "loss_reference_points_W_kg": {
+                "50Hz_1.0T": 1.80,
+                "50Hz_1.5T": 4.20,
+                "60Hz_1.0T": 2.00,
+                "60Hz_1.5T": 4.50
+            },
+            "lamination_thickness_mm": [0.35, 0.50],
             "stacking_factor": 0.93,
-            "frequency_range_Hz": [
-                50,
-                400
-            ],
+            "frequency_range_Hz": [50, 400],
             "typical_applications": [
                 "Motors",
-                "low-cost transformers"
+                "Low-cost transformers",
+                "Chokes"
             ],
-            "notes": "Lower cost, isotropic properties"
+            "power_range_note": "Budget option for 100-500VA",
+            "notes": "Lower cost, isotropic properties. Higher loss than M6."
+        },
+        "M4": {
+            "manufacturer": "Various (Premium)",
+            "type": "High-B grain-oriented silicon steel",
+            "description": "Premium HBGOES for highest efficiency",
+            "Bsat_T": 1.9,
+            "Bmax_recommended_T": 1.7,
+            "mu_i": 1800,
+            "mu_max": 50000,
+            "resistivity_uOhm_cm": 48,
+            "density_g_cm3": 7.65,
+            "temp_max_C": 150,
+            "steinmetz": {
+                "k": 1.5e-6,
+                "alpha": 1.5,
+                "beta": 2.0,
+                "reference_conditions": "60Hz, 1.5T, ambient"
+            },
+            "loss_reference_points_W_kg": {
+                "50Hz_1.5T": 1.05,
+                "50Hz_1.7T": 1.40,
+                "60Hz_1.5T": 1.20,
+                "60Hz_1.7T": 1.55
+            },
+            "lamination_thickness_mm": [0.23, 0.27],
+            "stacking_factor": 0.96,
+            "frequency_range_Hz": [50, 400],
+            "typical_applications": [
+                "High efficiency distribution transformers",
+                "Premium audio transformers"
+            ],
+            "power_range_note": "Premium choice for 500VA+ where efficiency matters",
+            "notes": "~20% lower loss than M6. Higher cost."
         }
     },
     "amorphous": {
         "2605SA1": {
             "manufacturer": "Metglas",
             "type": "Iron-based amorphous alloy",
+            "description": "Ultra-low loss material for high efficiency transformers",
             "Bsat_T": 1.56,
             "Bmax_recommended_T": 1.35,
             "mu_i": 45000,
+            "mu_max": 600000,
             "resistivity_uOhm_cm": 130,
             "density_g_cm3": 7.18,
             "curie_temp_C": 395,
             "temp_max_C": 150,
-            "steinmetz_k": 0.004,
-            "steinmetz_alpha": 1.5,
-            "steinmetz_beta": 2.1,
-            "loss_W_kg_60Hz_1T": 0.15,
-            "loss_W_kg_60Hz_1_4T": 0.45,
+            "steinmetz": {
+                "k": 1.5e-7,
+                "alpha": 1.5,
+                "beta": 2.1,
+                "reference_conditions": "60Hz, 1.35T, ambient",
+                "temp_coefficients": {
+                    "25": 1.00,
+                    "60": 0.95,
+                    "100": 0.90,
+                    "150": 0.85
+                }
+            },
+            "loss_reference_points_W_kg": {
+                "60Hz_1.0T": 0.12,
+                "60Hz_1.35T": 0.35,
+                "400Hz_1.0T": 0.80,
+                "50kHz_0.3T": 5.0
+            },
             "ribbon_thickness_um": 25,
-            "frequency_range_Hz": [
-                60,
-                50000
-            ],
+            "frequency_range_Hz": [60, 50000],
             "typical_applications": [
                 "High efficiency distribution transformers",
-                "medium frequency"
+                "Medium frequency transformers",
+                "Aircraft power systems"
             ],
-            "notes": "Very low loss, good for 400Hz-20kHz"
+            "power_range_note": "Premium choice for 200VA-10kVA where efficiency is critical",
+            "notes": "~75% lower loss than GOES. Critical for energy-efficient systems."
+        },
+        "2605S3A": {
+            "manufacturer": "Metglas",
+            "type": "Iron-based amorphous alloy",
+            "description": "High saturation amorphous for medium frequency",
+            "Bsat_T": 1.41,
+            "Bmax_recommended_T": 1.2,
+            "mu_i": 35000,
+            "resistivity_uOhm_cm": 138,
+            "density_g_cm3": 7.29,
+            "curie_temp_C": 358,
+            "temp_max_C": 150,
+            "steinmetz": {
+                "k": 2.5e-7,
+                "alpha": 1.55,
+                "beta": 2.1
+            },
+            "loss_reference_points_W_kg": {
+                "60Hz_1.0T": 0.18,
+                "1kHz_0.5T": 1.5,
+                "10kHz_0.3T": 10
+            },
+            "ribbon_thickness_um": 25,
+            "frequency_range_Hz": [60, 100000],
+            "typical_applications": [
+                "Aircraft transformers",
+                "Military power systems",
+                "High reliability applications"
+            ],
+            "notes": "Extended frequency range vs 2605SA1"
+        }
+    },
+    "nanocrystalline": {
+        "Vitroperm_500F": {
+            "manufacturer": "Vacuumschmelze",
+            "type": "Nanocrystalline FeCuNbSiB",
+            "description": "Ultra-high permeability for EMI and CM chokes",
+            "Bsat_T": 1.2,
+            "Bmax_recommended_T": 1.0,
+            "mu_i": 80000,
+            "mu_max": 800000,
+            "resistivity_uOhm_cm": 115,
+            "density_g_cm3": 7.35,
+            "curie_temp_C": 570,
+            "temp_max_C": 150,
+            "steinmetz": {
+                "k": 1.0e-7,
+                "alpha": 1.6,
+                "beta": 2.2,
+                "reference_conditions": "100kHz, 100mT, ambient"
+            },
+            "loss_reference_points_mW_cm3": {
+                "20kHz_200mT": 30,
+                "100kHz_100mT": 50,
+                "100kHz_50mT": 15
+            },
+            "ribbon_thickness_um": 20,
+            "frequency_range_Hz": [100, 1000000],
+            "typical_applications": [
+                "Common mode chokes",
+                "EMI filters",
+                "Current transformers"
+            ],
+            "notes": "Very high permeability. Excellent for CM noise suppression."
         }
     },
     "powder_cores": {
         "MPP": {
-            "type": "Molypermalloy Powder",
-            "mu_range": [
-                14,
-                550
-            ],
-            "Bsat_T": 0.8,
+            "manufacturer": "Magnetics Inc, Micrometals, etc.",
+            "type": "Molypermalloy Powder (Ni-Fe-Mo)",
+            "description": "Lowest loss powder core, best temperature stability",
+            "mu_range": [14, 550],
+            "Bsat_T": 0.80,
             "temp_coefficient_ppm_C": 25,
             "dc_bias_performance": "excellent",
             "core_loss_relative": 1.0,
-            "frequency_range_Hz": [
-                1000,
-                500000
-            ],
+            "density_g_cm3": 8.0,
+            "steinmetz": {
+                "k": 1.5e-6,
+                "alpha": 1.2,
+                "beta": 2.0
+            },
+            "frequency_range_Hz": [1000, 500000],
             "typical_applications": [
                 "Resonant inductors",
-                "output filters"
+                "LC filters",
+                "High-Q inductors"
             ],
-            "notes": "Best temperature stability, lowest loss"
+            "power_range_note": "Best for LC resonant tanks in 1kW+ converters",
+            "notes": "Lowest loss, highest cost. Best temp stability of powder cores."
         },
         "Kool_Mu": {
-            "type": "Sendust powder",
-            "mu_range": [
-                26,
-                125
-            ],
-            "Bsat_T": 1.0,
+            "manufacturer": "Magnetics Inc, etc.",
+            "type": "Sendust powder (Fe-Si-Al)",
+            "description": "Good balance of saturation, loss, and cost",
+            "mu_range": [26, 125],
+            "Bsat_T": 1.05,
             "temp_coefficient_ppm_C": 95,
             "dc_bias_performance": "good",
             "core_loss_relative": 2.5,
-            "frequency_range_Hz": [
-                1000,
-                500000
-            ],
+            "density_g_cm3": 6.5,
+            "steinmetz": {
+                "k": 2.5e-6,
+                "alpha": 1.3,
+                "beta": 2.0
+            },
+            "frequency_range_Hz": [1000, 500000],
             "typical_applications": [
                 "Power inductors",
-                "line filters"
+                "PFC inductors",
+                "Line filters"
             ],
-            "notes": "Good balance of saturation and loss"
+            "power_range_note": "Common for 500W-5kW PFC inductors",
+            "notes": "Good compromise of saturation and loss. Popular for PFC."
         },
         "High_Flux": {
+            "manufacturer": "Magnetics Inc, etc.",
             "type": "50% Ni-Fe powder",
-            "mu_range": [
-                14,
-                160
-            ],
-            "Bsat_T": 1.5,
+            "description": "Highest saturation powder core for high DC bias",
+            "mu_range": [14, 160],
+            "Bsat_T": 1.50,
             "temp_coefficient_ppm_C": 500,
             "dc_bias_performance": "best",
             "core_loss_relative": 5.0,
-            "frequency_range_Hz": [
-                1000,
-                200000
-            ],
+            "density_g_cm3": 8.2,
+            "steinmetz": {
+                "k": 4.0e-6,
+                "alpha": 1.3,
+                "beta": 2.0
+            },
+            "frequency_range_Hz": [1000, 200000],
             "typical_applications": [
                 "High DC bias inductors",
-                "PFC chokes"
+                "Buck/boost chokes",
+                "Energy storage inductors"
             ],
-            "notes": "Highest saturation, highest loss"
+            "power_range_note": "For high-current inductors in 1kW+ converters",
+            "notes": "Highest saturation but also highest loss. Use when DC bias is critical."
+        },
+        "XFlux": {
+            "manufacturer": "Magnetics Inc",
+            "type": "Fe-Si powder",
+            "description": "Economical high saturation powder core",
+            "mu_range": [26, 90],
+            "Bsat_T": 1.60,
+            "temp_coefficient_ppm_C": 600,
+            "dc_bias_performance": "excellent",
+            "core_loss_relative": 6.0,
+            "density_g_cm3": 7.5,
+            "steinmetz": {
+                "k": 5.0e-6,
+                "alpha": 1.35,
+                "beta": 2.0
+            },
+            "frequency_range_Hz": [1000, 100000],
+            "typical_applications": [
+                "Low-cost power inductors",
+                "Line reactors",
+                "Output chokes"
+            ],
+            "power_range_note": "Cost-effective for high-current 1kW+ applications",
+            "notes": "Lowest cost high-saturation core. Higher loss than High Flux."
         }
     }
 }

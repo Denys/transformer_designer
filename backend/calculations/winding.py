@@ -1,10 +1,16 @@
 """
 Winding calculations: turns, wire sizing, resistance
 Based on McLyman's methodology
+
+Includes:
+- AWG wire selection
+- Litz wire recommendation for high-frequency designs (>50kHz)
+- Skin depth and proximity effect calculations
+- DC and AC resistance estimation
 """
 
 import math
-from typing import Tuple, Optional, Literal
+from typing import Tuple, Optional, Literal, Dict
 
 # Copper resistivity at 20°C [Ω·cm]
 RHO_COPPER_20C = 1.724e-6
@@ -56,6 +62,26 @@ AWG_TABLE = {
     38: (0.101, 0.00797, 0.0000797),
     39: (0.090, 0.00632, 0.0000632),
     40: (0.080, 0.00501, 0.0000501),
+    41: (0.071, 0.00397, 0.0000397),
+    42: (0.064, 0.00321, 0.0000321),
+    43: (0.056, 0.00246, 0.0000246),
+    44: (0.051, 0.00204, 0.0000204),
+    45: (0.045, 0.00159, 0.0000159),
+    46: (0.040, 0.00126, 0.0000126),
+}
+
+# Standard Litz wire bundle sizes (hex packing for round strands)
+LITZ_BUNDLE_SIZES = [7, 19, 37, 65, 127, 259, 427, 741, 1050, 2100]
+
+# Recommended strand gauges for Litz wire by frequency range
+LITZ_STRAND_AWG_BY_FREQ = {
+    # (min_freq_Hz, max_freq_Hz): recommended_strand_awg
+    (20000, 50000): 40,      # 20-50 kHz: AWG 40 (0.08mm)
+    (50000, 100000): 42,     # 50-100 kHz: AWG 42 (0.064mm)
+    (100000, 200000): 44,    # 100-200 kHz: AWG 44 (0.051mm)
+    (200000, 500000): 44,    # 200-500 kHz: AWG 44
+    (500000, 1000000): 46,   # 500kHz-1MHz: AWG 46 (0.040mm)
+    (1000000, 5000000): 46,  # 1-5 MHz: AWG 46
 }
 
 
@@ -187,7 +213,304 @@ def select_wire_gauge(
         "strands": strands,
         "skin_effect_limited": frequency_Hz > 0,
         "skin_depth_mm": skin_depth_mm,
+        "wire_type": "solid",
     }
+
+
+def recommend_litz_wire(
+    required_area_cm2: float,
+    frequency_Hz: float,
+    current_rms_A: float = None,
+    max_strand_diameter_mm: float = None,
+    optimization: Literal["loss", "cost", "size"] = "loss",
+) -> Dict:
+    """
+    Recommend Litz wire configuration for high-frequency applications.
+    
+    Litz wire consists of many individually-insulated strands woven together
+    to reduce skin and proximity effect losses at high frequencies.
+    
+    Rules of thumb:
+    - Strand diameter should be ≤ 2 × skin depth for effective loss reduction
+    - Common strand gauges: 38, 40, 42, 44, 46 AWG
+    - Bundle in groups of 7, 19, 37, 65, 127... (hexagonal packing)
+    - Effective at frequencies 20 kHz - 2 MHz
+    
+    Args:
+        required_area_cm2: Required copper area [cm²]
+        frequency_Hz: Operating frequency [Hz]
+        current_rms_A: RMS current (optional, for loss estimation)
+        max_strand_diameter_mm: Override for max strand diameter [mm]
+        optimization: "loss" (lowest AC resistance), "cost" (fewer strands),
+                     "size" (smallest bundle OD)
+    
+    Returns:
+        Dict with Litz wire specification:
+        - strand_awg: AWG of individual strands
+        - strand_count: Number of strands
+        - bundle_arrangement: How strands are grouped (e.g., "19x27")
+        - outer_diameter_mm: Estimated bundle outer diameter
+        - total_area_cm2: Total copper cross-section
+        - ac_factor: Estimated RAC/RDC ratio (should be close to 1.0)
+        - effective_at_frequency: Whether this Litz config is effective
+        
+    Reference:
+        McLyman, Chapter 7 - Litz Wire
+        Hurley & Wölfle, "Transformers and Inductors for Power Electronics"
+    """
+    if frequency_Hz < 10000:
+        # Below 10kHz, solid wire is usually adequate
+        return {
+            "wire_type": "solid",
+            "recommendation": "Frequency too low for Litz wire benefit",
+            "threshold_Hz": 20000,
+        }
+    
+    # Calculate skin depth
+    skin_depth_mm = calculate_skin_depth(frequency_Hz)
+    
+    # Determine max strand diameter (should be < 2δ, ideally < 1.5δ)
+    if max_strand_diameter_mm is None:
+        # Conservative: strand ≤ 1.5 × skin depth
+        max_strand_d = 1.5 * skin_depth_mm
+        # Even more conservative for very high frequencies
+        if frequency_Hz > 500000:
+            max_strand_d = skin_depth_mm
+    else:
+        max_strand_d = min(max_strand_diameter_mm, 2 * skin_depth_mm)
+    
+    # Select strand AWG based on frequency range
+    strand_awg = _select_litz_strand_awg(frequency_Hz, max_strand_d)
+    strand_dia_mm, strand_area_mm2 = awg_to_mm(strand_awg)
+    strand_area_cm2 = strand_area_mm2 / 100
+    
+    # Calculate required number of strands
+    strands_needed = math.ceil(required_area_cm2 / strand_area_cm2)
+    
+    # Round up to standard bundle size
+    bundle_size = _select_bundle_size(strands_needed, optimization)
+    
+    # Calculate actual total area
+    total_area_cm2 = strand_area_cm2 * bundle_size
+    
+    # Estimate bundle outer diameter
+    # For hexagonal packing, the number of strands across diameter ≈ sqrt(N * 4/π) * 0.866
+    # Plus insulation and serving adds ~20-30%
+    strands_across = math.sqrt(bundle_size * 4 / math.pi) * 0.866
+    bundle_od_bare = strands_across * strand_dia_mm
+    bundle_od_insulated = bundle_od_bare * 1.25  # ~25% for insulation and voids
+    
+    # Calculate estimated AC resistance factor
+    # For well-designed Litz, RAC/RDC should be 1.0-1.3 at the design frequency
+    ac_factor = _estimate_litz_ac_factor(strand_dia_mm, frequency_Hz, bundle_size)
+    
+    # Determine bundle arrangement string (e.g., "7x7x7" for 343 strands)
+    arrangement = _describe_bundle_arrangement(bundle_size)
+    
+    # Check if this configuration is effective
+    is_effective = (strand_dia_mm <= 2 * skin_depth_mm) and (ac_factor < 1.5)
+    
+    # Calculate resistance per meter (for reference)
+    # Rdc per meter = ρ / A, where ρ for copper ≈ 1.72e-8 Ω·m
+    rho_copper = 1.72e-8  # Ω·m
+    Rdc_per_m_mOhm = (rho_copper / (total_area_cm2 * 1e-4)) * 1000  # mΩ/m
+    
+    # Estimate DC loss if current provided
+    loss_estimate = None
+    if current_rms_A is not None:
+        # P = I²R per meter
+        loss_per_m_W = (current_rms_A ** 2) * (Rdc_per_m_mOhm / 1000) * ac_factor
+        loss_estimate = round(loss_per_m_W, 3)
+    
+    return {
+        "wire_type": "litz",
+        "strand_awg": strand_awg,
+        "strand_diameter_mm": round(strand_dia_mm, 4),
+        "strand_count": bundle_size,
+        "bundle_arrangement": arrangement,
+        "outer_diameter_mm": round(bundle_od_insulated, 2),
+        "total_area_cm2": round(total_area_cm2, 6),
+        "total_area_mm2": round(total_area_cm2 * 100, 4),
+        "Rdc_mOhm_per_m": round(Rdc_per_m_mOhm, 3),
+        "ac_factor": round(ac_factor, 3),
+        "skin_depth_mm": round(skin_depth_mm, 4),
+        "effective_at_frequency": is_effective,
+        "loss_per_m_W": loss_estimate,
+        "notes": _litz_notes(strand_awg, bundle_size, frequency_Hz, is_effective),
+    }
+
+
+def _select_litz_strand_awg(frequency_Hz: float, max_diameter_mm: float) -> int:
+    """
+    Select appropriate strand AWG based on frequency and max diameter.
+    
+    Returns AWG that satisfies both frequency recommendation and diameter limit.
+    """
+    # Find recommended AWG from frequency table
+    recommended_awg = 40  # Default
+    for (f_min, f_max), awg in LITZ_STRAND_AWG_BY_FREQ.items():
+        if f_min <= frequency_Hz < f_max:
+            recommended_awg = awg
+            break
+    else:
+        if frequency_Hz >= 5000000:
+            recommended_awg = 46
+    
+    # Check if recommended AWG fits within diameter limit
+    for awg in range(recommended_awg, 47):
+        dia_mm, _ = awg_to_mm(awg)
+        if dia_mm <= max_diameter_mm:
+            return awg
+    
+    # If nothing fits, use finest available
+    return 46
+
+
+def _select_bundle_size(strands_needed: int, optimization: str) -> int:
+    """
+    Select standard bundle size based on required strands and optimization goal.
+    """
+    if optimization == "cost":
+        # Prefer smaller bundles (fewer strands = lower cost)
+        for size in LITZ_BUNDLE_SIZES:
+            if size >= strands_needed:
+                return size
+    elif optimization == "size":
+        # Choose closest to minimize excess copper
+        closest = min(LITZ_BUNDLE_SIZES, key=lambda s: abs(s - strands_needed))
+        if closest >= strands_needed * 0.9:  # Allow up to 10% under
+            return closest
+        return min(s for s in LITZ_BUNDLE_SIZES if s >= strands_needed)
+    else:  # optimization == "loss" or default
+        # Allow some overhead for better fill factor
+        for size in LITZ_BUNDLE_SIZES:
+            if size >= strands_needed * 0.95:  # 5% margin OK for loss
+                return size
+    
+    # If strands needed exceeds largest standard size, use multiple bundles
+    return strands_needed
+
+
+def _estimate_litz_ac_factor(strand_dia_mm: float, frequency_Hz: float, num_strands: int) -> float:
+    """
+    Estimate AC/DC resistance ratio for Litz wire.
+    
+    For well-designed Litz with proper twisting and strand size < 2δ,
+    the AC factor should approach 1.0. In practice:
+    - 1.0-1.1: Excellent (strand << skin depth)
+    - 1.1-1.3: Good (strand < skin depth)
+    - 1.3-1.5: Acceptable (strand ~ skin depth)
+    - >1.5: Poor (strand > skin depth, losing Litz benefit)
+    
+    This is a simplified model; real performance depends on:
+    - Twist pitch and pattern
+    - Bundle arrangement (concentric vs. braided)
+    - Proximity effects from adjacent windings
+    """
+    skin_depth_mm = calculate_skin_depth(frequency_Hz)
+    d_delta = strand_dia_mm / skin_depth_mm
+    
+    # Skin effect contribution per strand
+    if d_delta < 0.5:
+        Fr_skin = 1.0
+    elif d_delta < 1.0:
+        Fr_skin = 1.0 + 0.1 * (d_delta ** 2)
+    elif d_delta < 2.0:
+        Fr_skin = 1.0 + 0.3 * (d_delta ** 2)
+    else:
+        Fr_skin = d_delta  # Losing Litz benefit
+    
+    # Proximity effect between strands (reduced by twisting)
+    # Assume proper twisting reduces proximity by factor of ~10 vs. parallel wires
+    if num_strands <= 19:
+        Fr_prox = 1.0
+    elif num_strands <= 65:
+        Fr_prox = 1.0 + 0.02 * (d_delta ** 2)
+    elif num_strands <= 259:
+        Fr_prox = 1.0 + 0.05 * (d_delta ** 2)
+    else:
+        Fr_prox = 1.0 + 0.1 * (d_delta ** 2)
+    
+    return Fr_skin * Fr_prox
+
+
+def _describe_bundle_arrangement(num_strands: int) -> str:
+    """
+    Describe the typical bundle arrangement for a given strand count.
+    
+    Common arrangements:
+    - 7: 7×1 (one bunch of 7)
+    - 19: 19×1
+    - 49: 7×7 (bunched of 7, then bunched again)
+    - 133: 19×7
+    - 259: 37×7
+    - 741: 19×39 or 7×106
+    """
+    arrangements = {
+        7: "7×1",
+        19: "19×1",
+        37: "37×1",
+        65: "65×1",
+        127: "127×1",
+        259: "37×7",
+        427: "61×7",
+        741: "19×39",
+        1050: "7×150",
+        2100: "7×300",
+    }
+    
+    if num_strands in arrangements:
+        return arrangements[num_strands]
+    
+    # For non-standard sizes, describe as single bunch
+    return f"{num_strands}×1"
+
+
+def _litz_notes(strand_awg: int, strand_count: int, frequency_Hz: float, is_effective: bool) -> str:
+    """Generate helpful notes about the Litz wire selection."""
+    notes = []
+    
+    if not is_effective:
+        notes.append("⚠ Strands may be too large for this frequency. Consider finer gauge.")
+    
+    if strand_count > 741:
+        notes.append("Large strand count - consider multiple parallel bundles.")
+    
+    if frequency_Hz > 1000000 and strand_awg < 44:
+        notes.append("For MHz range, consider AWG 44-46 strands.")
+    
+    if strand_count < 19:
+        notes.append("Small bundle - verify sufficient current capacity.")
+    
+    if not notes:
+        notes.append("Good configuration for specified frequency.")
+    
+    return " ".join(notes)
+
+
+def select_wire_for_frequency(
+    required_area_cm2: float,
+    frequency_Hz: float,
+    prefer_litz_above_Hz: float = 50000,
+) -> Dict:
+    """
+    Automatically select between solid wire and Litz wire based on frequency.
+    
+    Args:
+        required_area_cm2: Required conductor area [cm²]
+        frequency_Hz: Operating frequency [Hz]
+        prefer_litz_above_Hz: Frequency threshold for Litz preference [Hz]
+        
+    Returns:
+        Wire specification dict (either solid or Litz)
+    """
+    if frequency_Hz >= prefer_litz_above_Hz:
+        litz_spec = recommend_litz_wire(required_area_cm2, frequency_Hz)
+        if litz_spec.get("effective_at_frequency", False):
+            return litz_spec
+    
+    # Fall back to solid wire with strand recommendation
+    return select_wire_gauge(required_area_cm2, frequency_Hz)
 
 
 def calculate_turns(
