@@ -32,5 +32,6 @@ export { definePageMeta } from '../node_modules/nuxt/dist/pages/runtime/composab
 export { defineLazyHydrationComponent } from '#app/composables/lazy-hydration';
 export { useExport, ExportFormat, ExportFormatInfo, MASExportResponse, FEMMExportResponse } from '../composables/useExport';
 export { useOpenMagnetics, OpenMagneticsCore, CoreWithLoss, MaterialProperties, CoreLossCalculation, DatabaseSummary, CoreSearchParams, LossBasedSearchParams } from '../composables/useOpenMagnetics';
+export { usePulseDesign, PulseApplicationType, InsulationType, OvervoltageCategory, PollutionDegree, CoreMaterialType, PulseTransformerRequirements, PulseTransformerResult, GateDriverPreset } from '../composables/usePulseDesign';
 export { isDesignResult, isNoMatchResult, isLitzWire, useTransformerDesign, TransformerType, WaveformType, DesignMethodType, CoolingType, StatusType, ConfidenceLevel, WireType, CoreSource, TransformerRequirements, CoreSelection, LitzWireSpec, SolidWireSpec, WireSpec, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, ValidationItem, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../composables/useTransformerDesign';
 export { useNuxtDevTools } from '../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools';

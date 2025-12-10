@@ -531,6 +531,37 @@
                                             <span v-if="val.status === 'pass'" class="status-pass">✓ Match</span>
                                             <span v-else-if="val.status === 'warning'" class="status-warning">≈
                                                 Close</span>
+                                            <span v-else class="status-error">⚠ Check</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Export Actions -->
+                        <div class="mt-6 pt-6" style="border-top: 1px solid var(--color-border);">
+                            <h4 style="font-size: 0.9rem; color: var(--color-accent-primary); margin-bottom: 1rem;">
+                                📤 Export Design
+                            </h4>
+                            <div class="flex gap-3">
+                                <button @click="exportMAS" class="btn btn-secondary flex items-center gap-2">
+                                    <span>💾</span> MAS JSON
+                                </button>
+                                <button @click="exportFEMM" class="btn btn-secondary flex items-center gap-2">
+                                    <span>🧲</span> FEMM Script
+                                </button>
+                                <button @click="exportJSON" class="btn btn-secondary flex items-center gap-2">
+                                    <span>📋</span> Raw JSON
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
 <script setup lang="ts">
 import { useTransformerDesign, type DesignSuggestion, type AlternativeCore } from '~/composables/useTransformerDesign'
 

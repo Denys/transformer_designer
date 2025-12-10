@@ -120,6 +120,7 @@ declare global {
   const useNuxtDevTools: typeof import('../../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools').useNuxtDevTools
   const useOpenMagnetics: typeof import('../../composables/useOpenMagnetics').useOpenMagnetics
   const usePreviewMode: typeof import('../../node_modules/nuxt/dist/app/composables/preview').usePreviewMode
+  const usePulseDesign: typeof import('../../composables/usePulseDesign').usePulseDesign
   const useRequestEvent: typeof import('../../node_modules/nuxt/dist/app/composables/ssr').useRequestEvent
   const useRequestFetch: typeof import('../../node_modules/nuxt/dist/app/composables/ssr').useRequestFetch
   const useRequestHeader: typeof import('../../node_modules/nuxt/dist/app/composables/ssr').useRequestHeader
@@ -193,6 +194,9 @@ declare global {
   // @ts-ignore
   export type { OpenMagneticsCore, CoreWithLoss, MaterialProperties, CoreLossCalculation, DatabaseSummary, CoreSearchParams, LossBasedSearchParams } from '../../composables/useOpenMagnetics'
   import('../../composables/useOpenMagnetics')
+  // @ts-ignore
+  export type { PulseApplicationType, InsulationType, OvervoltageCategory, PollutionDegree, CoreMaterialType, PulseTransformerRequirements, PulseTransformerResult, GateDriverPreset } from '../../composables/usePulseDesign'
+  import('../../composables/usePulseDesign')
   // @ts-ignore
   export type { TransformerType, WaveformType, DesignMethodType, CoolingType, StatusType, ConfidenceLevel, WireType, CoreSource, TransformerRequirements, CoreSelection, LitzWireSpec, SolidWireSpec, WireSpec, WindingDesign, LossAnalysis, ThermalAnalysis, VerificationStatus, AlternativeCore, ValidationItem, TransformerDesignResult, DesignSuggestion, CoreAlternative, NoMatchResult } from '../../composables/useTransformerDesign'
   import('../../composables/useTransformerDesign')
@@ -320,6 +324,7 @@ declare module 'vue' {
     readonly useNuxtDevTools: UnwrapRef<typeof import('../../node_modules/@nuxt/devtools/dist/runtime/use-nuxt-devtools')['useNuxtDevTools']>
     readonly useOpenMagnetics: UnwrapRef<typeof import('../../composables/useOpenMagnetics')['useOpenMagnetics']>
     readonly usePreviewMode: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/preview')['usePreviewMode']>
+    readonly usePulseDesign: UnwrapRef<typeof import('../../composables/usePulseDesign')['usePulseDesign']>
     readonly useRequestEvent: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/ssr')['useRequestEvent']>
     readonly useRequestFetch: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/ssr')['useRequestFetch']>
     readonly useRequestHeader: UnwrapRef<typeof import('../../node_modules/nuxt/dist/app/composables/ssr')['useRequestHeader']>
