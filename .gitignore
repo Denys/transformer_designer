@@ -1,0 +1,485 @@
+# =============================================================================
+# COMPREHENSIVE .GITIGNORE FOR TRANSFORMER DESIGNER PROJECT
+# =============================================================================
+# This file prevents accidental publication of sensitive and proprietary
+# information to public repositories.
+# =============================================================================
+
+# =============================================================================
+# PROPRIETARY TECHNICAL DOCUMENTATION
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Dropless Transformer Specifications
+# All files, folders, and references containing dropless transformer specs
+# -----------------------------------------------------------------------------
+*[Dd]ropless*
+*dropless*
+*DROPLESS*
+Dropless_trafo*
+dropless_trafo*
+*dropless_transformer*
+*Dropless_Transformer*
+*dropless-transformer*
+*Dropless-Transformer*
+
+# -----------------------------------------------------------------------------
+# Systemprompt Nova Documentation
+# Any documentation, code, or configuration files related to systemprompt nova
+# -----------------------------------------------------------------------------
+*[Nn]ova*
+*NOVA*
+*systemprompt*
+*SYSTEMPROMPT*
+*SystemPrompt*
+*system_prompt*
+*system-prompt*
+ANTIGRAVITY_SP*
+*SP_v*NOVA*
+*sp_nova*
+*SP_NOVA*
+
+# =============================================================================
+# SPECIFIC FILES AND DIRECTORIES TO EXCLUDE
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Good Practices for System Prompt Writing
+# Including all file formats and variations
+# -----------------------------------------------------------------------------
+Good Practices for System Prompt Writing*
+good practices for system prompt writing*
+Good_Practices_for_System_Prompt_Writing*
+good_practices_for_system_prompt_writing*
+Good-Practices-for-System-Prompt-Writing*
+good-practices-for-system-prompt-writing*
+*System Prompt Writing*
+*system prompt writing*
+*SystemPromptWriting*
+
+# -----------------------------------------------------------------------------
+# Project Memory Directory and Contents
+# Excludes all project memory related files and folders
+# -----------------------------------------------------------------------------
+project_memory/
+project_memory/**
+project_memory*
+Project_Memory/
+Project_Memory/**
+.project_memory/
+.project_memory/**
+
+# -----------------------------------------------------------------------------
+# TO VERIFY Transformer Designer Calculations
+# File or folder with special character (!) in filename
+# Various patterns to catch all variations
+# -----------------------------------------------------------------------------
+! TO VERIFY*
+!\ TO\ VERIFY*
+\!\ TO\ VERIFY*
+*TO VERIFY Transformer Designer*
+*TO_VERIFY_Transformer_Designer*
+*TO-VERIFY-Transformer-Designer*
+*to_verify_transformer*
+*TO_VERIFY_transformer*
+[!]\ TO\ VERIFY*
+\! TO VERIFY Transformer Designer*
+
+# =============================================================================
+# ENVIRONMENT VARIABLES AND SECRETS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Environment Files
+# Files containing environment variables and configuration secrets
+# -----------------------------------------------------------------------------
+.env
+.env.*
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.test
+.env*.local
+*.env
+env.js
+env.json
+env.yaml
+env.yml
+.envrc
+
+# -----------------------------------------------------------------------------
+# API Keys and Tokens
+# Files that may contain API keys, tokens, or authentication credentials
+# -----------------------------------------------------------------------------
+*api_key*
+*apikey*
+*API_KEY*
+*APIKEY*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+*secret*
+*SECRET*
+*token*
+*TOKEN*
+*.token
+.tokens
+tokens.json
+api_keys.json
+credentials.json
+
+# -----------------------------------------------------------------------------
+# Authentication and Credentials
+# Files containing passwords, credentials, or authentication data
+# -----------------------------------------------------------------------------
+*password*
+*PASSWORD*
+*.password
+.credentials
+credentials/
+*credentials*
+*.credentials
+auth.json
+auth.yaml
+auth.yml
+.auth
+.htpasswd
+.htaccess
+*.htpasswd
+
+# =============================================================================
+# CONFIGURATION FILES WITH SECRETS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Application Configuration with Secrets
+# Configuration files that may contain sensitive information
+# -----------------------------------------------------------------------------
+config.local.*
+config.secret.*
+config.private.*
+*.local.json
+*.local.yaml
+*.local.yml
+*.secret.json
+*.secret.yaml
+*.secret.yml
+*.private.json
+*.private.yaml
+*.private.yml
+settings.local.*
+settings.secret.*
+secrets.json
+secrets.yaml
+secrets.yml
+secrets/
+.secrets
+.secrets/
+
+# -----------------------------------------------------------------------------
+# Database Configuration
+# Database connection strings and credentials
+# -----------------------------------------------------------------------------
+database.yml
+database.json
+db.json
+db.yaml
+*.sqlite
+*.sqlite3
+*.db
+*.sql
+dump.sql
+*.dump
+
+# =============================================================================
+# BACKUP AND TEMPORARY FILES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Backup Files
+# Various backup file formats that may contain sensitive data
+# -----------------------------------------------------------------------------
+*.bak
+*.backup
+*.back
+*~
+*.swp
+*.swo
+*.swn
+*.orig
+*.old
+*.save
+*.saved
+.backup/
+backup/
+backups/
+
+# -----------------------------------------------------------------------------
+# Temporary Files
+# Temporary files and directories
+# -----------------------------------------------------------------------------
+*.tmp
+*.temp
+*.cache
+.tmp/
+.temp/
+tmp/
+temp/
+.cache/
+cache/
+
+# -----------------------------------------------------------------------------
+# Editor Backup and Swap Files
+# Automatic backups created by text editors
+# -----------------------------------------------------------------------------
+*#
+.#*
+\#*\#
+*.un~
+Session.vim
+.netrwhist
+*.sublime-workspace
+
+# =============================================================================
+# IDE AND EDITOR SPECIFIC
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# VS Code
+# -----------------------------------------------------------------------------
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# -----------------------------------------------------------------------------
+# JetBrains IDEs (IntelliJ, PyCharm, etc.)
+# -----------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# -----------------------------------------------------------------------------
+# Other Editors
+# -----------------------------------------------------------------------------
+*.sublime-project
+*.sublime-workspace
+.atom/
+.brackets.json
+
+# =============================================================================
+# OPERATING SYSTEM FILES
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# macOS
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# -----------------------------------------------------------------------------
+# Windows
+# -----------------------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# -----------------------------------------------------------------------------
+# Linux
+# -----------------------------------------------------------------------------
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# PROGRAMMING LANGUAGE SPECIFIC
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+pyrightconfig.json
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env/
+
+# -----------------------------------------------------------------------------
+# Node.js / JavaScript
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.npm
+.yarn-integrity
+.nuxt/
+.next/
+.output/
+.turbo/
+dist/
+*.tsbuildinfo
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# =============================================================================
+# BUILD AND DEPENDENCY ARTIFACTS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build Directories
+# -----------------------------------------------------------------------------
+build/
+dist/
+out/
+target/
+*.build/
+
+# -----------------------------------------------------------------------------
+# Package Manager Lock Files (optional - uncomment if needed)
+# -----------------------------------------------------------------------------
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# uv.lock
+
+# =============================================================================
+# DOCUMENTATION AND NOTES (SENSITIVE)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Private Notes and Documentation
+# Files that may contain sensitive notes or proprietary information
+# -----------------------------------------------------------------------------
+PRIVATE*.md
+private*.md
+CONFIDENTIAL*.md
+confidential*.md
+INTERNAL*.md
+internal*.md
+notes.txt
+notes.md
+private_notes/
+.notes/
+
+# -----------------------------------------------------------------------------
+# Meeting Notes and Internal Communications
+# May contain sensitive business information
+# -----------------------------------------------------------------------------
+meeting_notes/
+internal/
+proprietary/
+
+# =============================================================================
+# ADDITIONAL SECURITY PATTERNS
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# SSH and GPG Keys
+# Critical security files that should never be committed
+# -----------------------------------------------------------------------------
+id_rsa
+id_rsa.pub
+id_dsa
+id_dsa.pub
+id_ecdsa
+id_ecdsa.pub
+id_ed25519
+id_ed25519.pub
+*.ppk
+known_hosts
+authorized_keys
+.ssh/
+.gnupg/
+*.gpg
+*.asc
+
+# -----------------------------------------------------------------------------
+# Cloud Provider Credentials
+# AWS, GCP, Azure credentials
+# -----------------------------------------------------------------------------
+.aws/
+.azure/
+.gcloud/
+gcloud-service-key.json
+*-service-account.json
+*-credentials.json
+
+# -----------------------------------------------------------------------------
+# Docker Secrets
+# -----------------------------------------------------------------------------
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+# -----------------------------------------------------------------------------
+# Terraform State (may contain secrets)
+# -----------------------------------------------------------------------------
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+
+# =============================================================================
+# END OF .GITIGNORE
+# =============================================================================
