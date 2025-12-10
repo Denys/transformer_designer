@@ -274,3 +274,67 @@ def estimate_loss_for_sizing(
     input_power = output_power_W / eta
     loss = input_power - output_power_W
     return loss
+
+
+def calculate_Bac_from_waveform(
+    Bmax_T: float,
+    waveform: str = "sine",
+    duty_cycle: float = 0.5,
+) -> float:
+    """
+    Calculate AC flux density based on waveform type.
+    
+    The relationship between Bmax (peak flux) and Bac (AC component for loss calc)
+    depends on the excitation waveform.
+    
+    Args:
+        Bmax_T: Maximum flux density [T]
+        waveform: Waveform type - "sine", "square", "triangle", "pulse"
+        duty_cycle: Duty cycle for square/pulse waveforms (0-1)
+        
+    Returns:
+        Bac_T: AC flux density for Steinmetz equation [T]
+        
+    Waveform factors:
+    - Sine wave: Bac = Bmax (peak-to-peak swing = 2×Bmax, amplitude = Bmax)
+    - Square wave: Bac = Bmax (full swing each half-cycle)
+    - Triangle wave: Bac = Bmax (same peak, different spectral content)
+    - Asymmetric pulse: Bac adjusted for DC bias
+    
+    Reference:
+        For Steinmetz equation, Bac should be the peak AC flux amplitude.
+        For bidirectional transformers: Bac = Bmax (full swing)
+        For forward converters with DC bias: Bac = ΔB/2
+    """
+    waveform = waveform.lower().strip()
+    
+    if waveform in ["sine", "sinusoidal"]:
+        # Sinusoidal excitation: Bac = Bmax
+        return Bmax_T
+    
+    elif waveform in ["square", "rectangular"]:
+        # Square wave: full flux swing each half-cycle
+        # For symmetric square wave, Bac = Bmax
+        # For asymmetric, adjust for duty cycle DC bias
+        if 0.45 <= duty_cycle <= 0.55:
+            # Symmetric - no DC bias
+            return Bmax_T
+        else:
+            # Asymmetric - some DC bias, reduced AC swing
+            # ΔB = Bmax × 2 × min(D, 1-D)
+            delta_B = 2 * Bmax_T * min(duty_cycle, 1 - duty_cycle)
+            return delta_B / 2
+    
+    elif waveform in ["triangle", "triangular", "sawtooth"]:
+        # Triangle wave: same peak, RMS factor different but Steinmetz uses peak
+        return Bmax_T
+    
+    elif waveform in ["pulse", "unipolar"]:
+        # Unipolar pulse (forward converter style)
+        # DC bias present, AC component is half the swing
+        return Bmax_T * duty_cycle
+    
+    else:
+        # Default: assume bidirectional, Bac = Bmax
+        return Bmax_T
+

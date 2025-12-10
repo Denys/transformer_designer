@@ -31,6 +31,7 @@ from .losses import (
     calculate_core_loss_steinmetz,
     calculate_copper_loss,
     calculate_total_losses,
+    calculate_Bac_from_waveform,
 )
 from .thermal import (
     calculate_surface_area,
@@ -74,6 +75,7 @@ __all__ = [
     "calculate_core_loss_steinmetz",
     "calculate_copper_loss",
     "calculate_total_losses",
+    "calculate_Bac_from_waveform",
     # thermal
     "calculate_surface_area",
     "calculate_power_dissipation_density",

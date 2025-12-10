@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 
+from calculations.losses import calculate_Bac_from_waveform
+
 logger = logging.getLogger(__name__)
 
 
@@ -227,7 +229,9 @@ class TransformerValidator:
             
             # Steinmetz calculation
             f_kHz = freq / 1000
-            Bac = Bmax / 2  # Approximate AC component
+            waveform = requirements.get('waveform', 'square')
+            duty_cycle = requirements.get('duty_cycle_percent', 50) / 100
+            Bac = calculate_Bac_from_waveform(Bmax, waveform, duty_cycle)
             loss_density = k * (f_kHz ** alpha) * (Bac ** beta)  # kW/m³
             Pcore_ref = loss_density * Ve_m3 * 1000  # W
             
@@ -495,7 +499,9 @@ class TransformerValidator:
             
             # Calculate loss using OpenMagnetics coefficients
             f_kHz = freq / 1000
-            Bac = Bmax / 2
+            waveform = requirements.get('waveform', 'square')
+            duty_cycle = requirements.get('duty_cycle_percent', 50) / 100
+            Bac = calculate_Bac_from_waveform(Bmax, waveform, duty_cycle)
             om_loss_density = mat_props.steinmetz_k * (f_kHz ** mat_props.steinmetz_alpha) * (Bac ** mat_props.steinmetz_beta)
             om_core_loss = om_loss_density * Ve_m3 * 1000
             

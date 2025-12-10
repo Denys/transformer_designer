@@ -36,6 +36,74 @@ def waveform_coefficient(waveform: Literal["sinusoidal", "square", "triangular"]
     return coefficients.get(waveform, 4.44)
 
 
+def calculate_bac_from_waveform(
+    Bmax_T: float,
+    waveform: Literal["sinusoidal", "square", "triangular", "trapezoidal"],
+    duty_cycle: float = 0.5,
+) -> float:
+    """
+    Calculate AC flux density swing (Bac) based on waveform type.
+    
+    For transformers, Bac is the peak-to-peak flux swing divided by 2.
+    This is NOT simply Bmax/2 for all waveforms!
+    
+    Args:
+        Bmax_T: Maximum flux density [T]
+        waveform: Waveform type
+        duty_cycle: Duty cycle for asymmetric waveforms (0-1)
+        
+    Returns:
+        Bac: AC flux density for core loss calculations [T]
+        
+    Waveform-specific calculations:
+        - Sinusoidal: Bac = Bmax (Bmax is the peak value)
+        - Square: Bac = Bmax (full swing from -Bmax to +Bmax)
+        - Triangular: Bac = Bmax (linear swing)
+        - Trapezoidal: Bac = Bmax × (depends on duty cycle)
+        
+    For core loss calculations using Steinmetz equation:
+        P_v = k × f^α × B_ac^β
+        
+    Reference:
+        McLyman Chapter 4, Erickson "Fundamentals of Power Electronics"
+        - For transformers: flux swings full ±Bpk range
+        - For PWM/forward converters: flux resets, use actual ΔB
+    """
+    if Bmax_T <= 0:
+        raise ValueError("Bmax must be positive")
+    
+    if not 0 < duty_cycle <= 1.0:
+        raise ValueError("Duty cycle must be between 0 and 1")
+    
+    if waveform == "sinusoidal":
+        # For sinusoidal, Bmax is the peak value
+        # Core loss uses RMS-equivalent: Bac = Bmax
+        return Bmax_T
+    
+    elif waveform == "square":
+        # Square wave: full swing from -Bmax to +Bmax
+        # Total swing = 2 × Bmax, but Bac for Steinmetz = Bmax
+        return Bmax_T
+    
+    elif waveform == "triangular":
+        # Triangular wave: linear rise/fall
+        # Bac = Bmax for symmetric triangular
+        return Bmax_T
+    
+    elif waveform == "trapezoidal":
+        # Trapezoidal (PWM-like): depends on duty cycle
+        # For D=0.5 (symmetric): Bac ≈ Bmax
+        # For D!=0.5: Bac varies with duty
+        # Simplified model: Bac = Bmax × (1 - |0.5 - D|/0.5)
+        # This gives Bac=Bmax at D=0.5, reduces for extreme duties
+        duty_factor = 1.0 - abs(0.5 - duty_cycle) / 0.5
+        return Bmax_T * duty_factor
+    
+    else:
+        # Default fallback: assume full swing
+        return Bmax_T
+
+
 def calculate_apparent_power(
     output_power_W: float,
     efficiency_percent: float = 90.0,

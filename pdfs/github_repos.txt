@@ -1,0 +1,6 @@
+
+
+
+https://github.com/opensourceelectrical/simulating-magnetics-for-power-electronics
+
+https://github.com/opensourceelectrical/switching-strategies-for-power-electronics

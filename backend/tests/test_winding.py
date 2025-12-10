@@ -160,3 +160,117 @@ class TestWindowUtilization:
         # 100 turns × 0.02 cm² × 1.3 insulation = 2.6 cm² in 1 cm² = Ku > 1
         assert Ku > 0.5, "Should detect filled window"
 
+
+class TestLitzWireRecommendation:
+    """Tests for Litz wire recommendation (Phase A Task 4)"""
+
+    def test_litz_not_recommended_below_10khz(self):
+        """Below 10kHz, solid wire should be recommended"""
+        from calculations.winding import recommend_litz_wire
+        result = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=5000)
+        assert result.get("wire_type") == "solid", "Should recommend solid wire below 10kHz"
+
+    def test_litz_recommended_at_100khz(self):
+        """At 100kHz, Litz wire should be effective"""
+        from calculations.winding import recommend_litz_wire
+        result = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=100000)
+        assert result.get("wire_type") == "litz", "Should recommend Litz at 100kHz"
+        assert result.get("effective_at_frequency"), "Litz should be effective at 100kHz"
+
+    def test_litz_strand_awg_vs_frequency(self):
+        """Higher frequency should recommend finer strands"""
+        from calculations.winding import recommend_litz_wire
+        result_50k = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=50000)
+        result_500k = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=500000)
+        
+        if result_50k.get("wire_type") == "litz" and result_500k.get("wire_type") == "litz":
+            assert result_500k["strand_awg"] >= result_50k["strand_awg"], \
+                "Higher frequency should use finer strands (higher AWG)"
+
+    def test_litz_ac_factor_near_unity(self):
+        """Well-designed Litz should have AC factor close to 1.0"""
+        from calculations.winding import recommend_litz_wire
+        result = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=100000)
+        
+        if result.get("wire_type") == "litz" and result.get("effective_at_frequency"):
+            ac_factor = result.get("ac_factor", 2.0)
+            assert 0.9 <= ac_factor <= 1.5, \
+                f"Effective Litz should have AC factor 1.0-1.5, got {ac_factor}"
+
+    def test_litz_skin_depth_constraint(self):
+        """Litz strand diameter should be ≤ 2× skin depth"""
+        from calculations.winding import recommend_litz_wire, calculate_skin_depth
+        freq = 200000
+        result = recommend_litz_wire(required_area_cm2=0.01, frequency_Hz=freq)
+        
+        if result.get("wire_type") == "litz":
+            skin_depth_mm = calculate_skin_depth(freq)
+            strand_dia_mm = result["strand_diameter_mm"]
+            assert strand_dia_mm <= 2.0 * skin_depth_mm, \
+                f"Strand dia {strand_dia_mm}mm > 2×δ={2*skin_depth_mm}mm"
+
+
+class TestLayerCalculationFromGeometry:
+    """Tests for geometry-aware layer calculation (Phase A Task 2)"""
+
+    def test_layer_calculation_basic(self):
+        """Basic layer calculation from window geometry"""
+        from calculations.winding import calculate_layers_from_geometry
+        
+        result = calculate_layers_from_geometry(
+            num_turns=50,
+            wire_diameter_mm=1.0,
+            window_area_cm2=2.0,
+            core_geometry="E",
+        )
+        
+        assert result["num_layers"] > 0, "Should calculate at least 1 layer"
+        assert result["turns_per_layer"] > 0, "Should calculate turns per layer"
+        assert result["bobbin_width_cm"] > 0, "Should estimate bobbin width"
+
+    def test_more_turns_more_layers(self):
+        """More turns should require more layers"""
+        from calculations.winding import calculate_layers_from_geometry
+        
+        result_20 = calculate_layers_from_geometry(
+            num_turns=20, wire_diameter_mm=1.0, window_area_cm2=2.0, core_geometry="E"
+        )
+        result_100 = calculate_layers_from_geometry(
+            num_turns=100, wire_diameter_mm=1.0, window_area_cm2=2.0, core_geometry="E"
+        )
+        
+        assert result_100["num_layers"] > result_20["num_layers"], \
+            "More turns should require more layers"
+
+    def test_narrower_window_fewer_turns_per_layer(self):
+        """Narrower window (same area) should fit fewer turns per layer"""
+        from calculations.winding import calculate_layers_from_geometry
+        
+        # Same Wa but different aspect ratios
+        result_e = calculate_layers_from_geometry(
+            num_turns=50, wire_diameter_mm=1.0, window_area_cm2=2.0, core_geometry="E"  # 1.5:1
+        )
+        result_rm = calculate_layers_from_geometry(
+            num_turns=50, wire_diameter_mm=1.0, window_area_cm2=2.0, core_geometry="RM"  # 0.8:1
+        )
+        
+        # RM has wider window, should fit more turns per layer
+        assert result_rm["turns_per_layer"] > result_e["turns_per_layer"], \
+            "RM (wider window) should fit more turns per layer than E-core"
+
+    def test_no_hardcoded_np_div_20(self):
+        """Layer count should NOT be simply Np//20"""
+        from calculations.winding import calculate_layers_from_geometry
+        
+        # Test with 60 turns - if using Np//20, would give 3 layers
+        result = calculate_layers_from_geometry(
+            num_turns=60, wire_diameter_mm=0.5, window_area_cm2=3.0, core_geometry="E"
+        )
+        
+        # With small wire and large window, should NOT default to 60//20=3
+        # Instead should calculate based on geometry
+        layers = result["num_layers"]
+        # With 0.5mm wire in 3cm² window, should fit many more turns per layer
+        assert layers != 3 or result["turns_per_layer"] != 20, \
+            "Should not use hardcoded Np//20 heuristic"
+

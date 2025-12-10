@@ -191,20 +191,41 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     """
     Design a complete pulse transformer.
     
-    Takes application requirements and returns a complete design including:
-    - Core selection
-    - Winding design
-    - Pulse response analysis
-    - Insulation requirements
-    - Thermal analysis
+    Supports:
+    - Gate drive transformers (HF, ferrite, Bmax ~0.2T)
+    - HV power pulse transformers (LF, silicon-steel, Bmax ~1.2T) - like Dropless
     """
+    # Determine if this is HV power pulse mode (energy transfer)
+    is_hv_power_pulse = requirements.application == PulseApplicationType.HV_POWER_PULSE
+    
+    # Handle millisecond pulse width (convert to µs for calculations)
+    pulse_width_us = requirements.pulse_width_us
+    if requirements.pulse_width_ms:
+        pulse_width_us = requirements.pulse_width_ms * 1000  # ms → µs
+    
+    # Select Bmax based on core material type and application
+    if requirements.core_material_type:
+        Bmax_by_type = {
+            "ferrite": 0.2,
+            "silicon_steel": 1.2,  # Much higher for silicon steel
+            "amorphous": 1.0,
+            "nanocrystalline": 0.8,
+        }
+        Bmax = Bmax_by_type.get(requirements.core_material_type.value, 0.2)
+    elif is_hv_power_pulse or requirements.frequency_Hz < 1000:
+        # Low frequency → silicon steel → high Bmax
+        Bmax = 1.2
+    else:
+        # High frequency → ferrite → conservative Bmax
+        Bmax = 0.2
+    
     # Calculate volt-second requirement
     Vt_result = design_for_volt_second(
         voltage_V=requirements.primary_voltage_V,
-        pulse_width_us=requirements.pulse_width_us,
+        pulse_width_us=pulse_width_us,
         duty_cycle_percent=requirements.duty_cycle_percent,
-        Bmax_T=0.2,  # Conservative for pulse
-        initial_turns=10,
+        Bmax_T=Bmax,
+        initial_turns=requirements.primary_turns or 10,
     )
     
     # Calculate insulation requirements
@@ -222,10 +243,15 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     required_Ae_cm2 = Vt_result.required_Ae_cm2
     estimated_Ap = required_Ae_cm2 * (required_Ae_cm2 * 2)
     
+    # For HV power pulse, prefer E/I laminated cores
+    preferred_geom = requirements.preferred_core_geometry
+    if is_hv_power_pulse and not preferred_geom:
+        preferred_geom = "EI"  # Default to E/I laminated for power pulse
+    
     cores = db.find_suitable_cores(
         required_Ap_cm4=estimated_Ap,
         frequency_Hz=requirements.frequency_Hz,
-        preferred_geometry=requirements.preferred_core_geometry,
+        preferred_geometry=preferred_geom,
         preferred_material=requirements.preferred_material,
         count=5,
     )
@@ -233,7 +259,7 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     if not cores:
         raise HTTPException(
             status_code=404,
-            detail=f"No suitable cores found for Ae ≥ {required_Ae_cm2:.3f} cm²"
+            detail=f"No suitable cores found for Ae ≥ {required_Ae_cm2:.3f} cm² (Bmax={Bmax}T). For HV power pulse, consider specifying larger Ae manually."
         )
     
     # Select best core (first one that meets Ae requirement)
@@ -249,38 +275,72 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     # Calculate turns ratio
     turns_ratio = requirements.secondary_voltage_V / requirements.primary_voltage_V
     
-    # Calculate primary turns from volt-second and actual Ae
-    Ae_cm2 = selected_core.get('Ae_cm2', required_Ae_cm2)
-    Ae_m2 = Ae_cm2 * 1e-4
-    Vt_Vs = Vt_result.volt_second_uVs * 1e-6
-    Bmax = 0.2
+    # Use specified turns if provided (for HV power pulse)
+    if requirements.primary_turns and requirements.secondary_turns:
+        primary_turns = requirements.primary_turns
+        secondary_turns = requirements.secondary_turns
+    else:
+        # Calculate primary turns from volt-second and actual Ae
+        Ae_cm2 = selected_core.get('Ae_cm2', required_Ae_cm2)
+        Ae_m2 = Ae_cm2 * 1e-4
+        Vt_Vs = Vt_result.volt_second_uVs * 1e-6
+        
+        primary_turns = max(1, int(math.ceil(Vt_Vs / (Ae_m2 * Bmax))))
+        secondary_turns = max(1, int(round(primary_turns * turns_ratio)))
     
-    primary_turns = max(1, int(math.ceil(Vt_Vs / (Ae_m2 * Bmax))))
-    secondary_turns = max(1, int(round(primary_turns * turns_ratio)))
+    # For HV power pulse: validate turns ratio
+    actual_ratio = secondary_turns / primary_turns if primary_turns > 0 else turns_ratio
+
     
     # Determine wire size based on peak current
-    # For gate drive, peak current is key
+    # For HV power pulse, primary current can be in kA range
     if requirements.peak_current_A:
-        Ip_peak = requirements.peak_current_A / turns_ratio
+        # For HV power pulse, peak_current_A is primary current
+        if is_hv_power_pulse:
+            Ip_peak = requirements.peak_current_A
+        else:
+            Ip_peak = requirements.peak_current_A / turns_ratio
     elif requirements.load_resistance_ohm:
         Ip_peak = requirements.secondary_voltage_V / requirements.load_resistance_ohm / turns_ratio
     else:
         Ip_peak = 1.0  # Default 1A
     
-    # Wire sizing (conservative for pulse - current density ~5A/mm²)
-    wire_area_mm2 = Ip_peak / 5
+    # Wire sizing: use higher current density for pulse (5-10 A/mm² for short pulses)
+    current_density = 5.0  # A/mm² - conservative
+    if is_hv_power_pulse and pulse_width_us < 10000:  # < 10ms pulse
+        current_density = 10.0  # Higher density OK for short pulses
+    
+    wire_area_mm2 = Ip_peak / current_density
     wire_dia_mm = math.sqrt(4 * wire_area_mm2 / math.pi)
     
-    # Find nearest AWG
-    awg_table = [(awg, awg_to_mm(awg)) for awg in range(20, 40)]
-    primary_awg = min(awg_table, key=lambda x: abs(x[1] - wire_dia_mm))[0]
-    primary_wire_dia = awg_to_mm(primary_awg)
+    # For kA currents, use foil or cable instead of AWG
+    if Ip_peak > 100:
+        # Use foil or cable description instead of AWG
+        primary_awg = None
+        primary_wire_dia = wire_dia_mm
+        primary_wire_type = "foil" if wire_area_mm2 > 50 else "cable"
+    else:
+        # Find nearest AWG (extend range for larger wires)
+        # awg_to_mm returns (diameter_mm, area_mm2) tuple
+        awg_table = [(awg, awg_to_mm(awg)[0]) for awg in range(10, 40)]  # AWG 10-40 range
+        primary_awg = min(awg_table, key=lambda x: abs(x[1] - wire_dia_mm))[0]
+        primary_wire_dia = awg_to_mm(primary_awg)[0]  # Get diameter from tuple
+        primary_wire_type = "solid"
     
-    # Secondary wire (same or larger for 1:1, scaled for ratio)
-    secondary_wire_area = wire_area_mm2 * turns_ratio
+    # Secondary wire (scaled by turns ratio for current)
+    secondary_current = Ip_peak / turns_ratio if turns_ratio > 1 else Ip_peak * turns_ratio
+    secondary_wire_area = secondary_current / current_density
     secondary_wire_dia = math.sqrt(4 * secondary_wire_area / math.pi)
-    secondary_awg = min(awg_table, key=lambda x: abs(x[1] - secondary_wire_dia))[0]
-    secondary_wire_dia_actual = awg_to_mm(secondary_awg)
+    
+    if secondary_current > 100:
+        secondary_awg = None
+        secondary_wire_dia_actual = secondary_wire_dia
+        secondary_wire_type = "foil" if secondary_wire_area > 50 else "cable"
+    else:
+        awg_table = [(awg, awg_to_mm(awg)[0]) for awg in range(10, 40)]  # Get diameter from tuple
+        secondary_awg = min(awg_table, key=lambda x: abs(x[1] - secondary_wire_dia))[0]
+        secondary_wire_dia_actual = awg_to_mm(secondary_awg)[0]  # Get diameter from tuple
+        secondary_wire_type = "solid"
     
     # Calculate inductances
     lm_cm = selected_core.get('lm_cm', 3.0)
@@ -323,12 +383,13 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     )
     Cw_pF = Cw * 1e12
     
-    # Calculate DC resistance
-    primary_length_m = primary_turns * MLT_m
-    secondary_length_m = secondary_turns * MLT_m
+    # Calculate DC resistance using (turns, MLT_cm, wire_area_cm2)
+    primary_wire_area_cm2 = wire_area_mm2 * 1e-2  # mm² to cm²
+    secondary_wire_area_cm2 = secondary_wire_area * 1e-2
+    MLT_cm = MLT_m * 100
     
-    primary_Rdc = calculate_dc_resistance(primary_length_m * 100, primary_wire_dia) * 1000  # mΩ
-    secondary_Rdc = calculate_dc_resistance(secondary_length_m * 100, secondary_wire_dia_actual) * 1000
+    primary_Rdc = calculate_dc_resistance(primary_turns, MLT_cm, primary_wire_area_cm2) * 1000  # mΩ
+    secondary_Rdc = calculate_dc_resistance(secondary_turns, MLT_cm, secondary_wire_area_cm2) * 1000
     
     # Analyze pulse response
     load_R = requirements.load_resistance_ohm or 10  # Default 10Ω
@@ -394,8 +455,11 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         
         "primary": {
             "turns": primary_turns,
+            "wire_type": primary_wire_type if 'primary_wire_type' in dir() else "solid",
             "wire_awg": primary_awg,
             "wire_diameter_mm": round(primary_wire_dia, 3),
+            "wire_area_mm2": round(wire_area_mm2, 2),
+            "peak_current_A": round(Ip_peak, 1),
             "layers": 1,
             "Rdc_mOhm": round(primary_Rdc, 3),
             "inductance_uH": round(Lm_uH, 2),
@@ -403,8 +467,10 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         
         "secondary": {
             "turns": secondary_turns,
+            "wire_type": secondary_wire_type if 'secondary_wire_type' in dir() else "solid",
             "wire_awg": secondary_awg,
             "wire_diameter_mm": round(secondary_wire_dia_actual, 3),
+            "wire_area_mm2": round(secondary_wire_area, 2),
             "layers": 1,
             "Rdc_mOhm": round(secondary_Rdc, 3),
         },

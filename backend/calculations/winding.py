@@ -513,6 +513,126 @@ def select_wire_for_frequency(
     return select_wire_gauge(required_area_cm2, frequency_Hz)
 
 
+def calculate_layers_from_geometry(
+    num_turns: int,
+    wire_diameter_mm: float,
+    window_area_cm2: float,
+    core_geometry: str = "E",
+    fill_factor: float = 0.75,
+) -> dict:
+    """
+    Calculate number of winding layers from window geometry.
+    
+    This replaces the crude Np//20 heuristic with geometry-aware calculation
+    based on actual window dimensions and wire size.
+    
+    Args:
+        num_turns: Total number of turns
+        wire_diameter_mm: Wire diameter including insulation [mm]
+        window_area_cm2: Core window area [cm²]
+        core_geometry: Core shape family (E, ETD, PQ, etc.)
+        fill_factor: Practical fill factor accounting for irregular packing (0.7-0.85)
+        
+    Returns:
+        dict with:
+            - num_layers: Number of layers
+            - turns_per_layer: Turns fitting in one layer
+            - bobbin_width_cm: Estimated bobbin winding width
+            - window_height_cm: Estimated window height
+            - layer_thickness_cm: Thickness of one layer
+            
+    Window geometry estimation:
+        For E-cores: window is roughly 1.5:1 (height:width) ratio
+        For PQ/pot cores: more square, ~1.2:1
+        For toroids: use rectangular approximation
+        
+    Reference:
+        McLyman Chapter 5 - practical winding layout considers:
+        - Wire diameter + insulation (~10% increase)
+        - Layer insulation (~0.1-0.2mm between layers)
+        - Edge margins (~2mm on each end)
+    """
+    if num_turns <= 0 or wire_diameter_mm <= 0 or window_area_cm2 <= 0:
+        return {
+            "num_layers": 1,
+            "turns_per_layer": num_turns,
+            "bobbin_width_cm": 1.0,
+            "window_height_cm": 1.0,
+            "layer_thickness_cm": 0.1,
+        }
+    
+    # Estimate window aspect ratio from core geometry
+    geometry_upper = core_geometry.upper()
+    
+    if geometry_upper in ['E', 'EE', 'EI', 'ETD', 'ER', 'EQ', 'EFD', 'EP']:
+        # E-type cores: tall window, aspect ratio ~1.5:1 (H:W)
+        aspect_ratio = 1.5
+    elif geometry_upper in ['PQ', 'PM', 'P', 'POT']:
+        # Pot cores: more square window
+        aspect_ratio = 1.2
+    elif geometry_upper in ['RM']:
+        # RM cores: low profile, wider window
+        aspect_ratio = 0.8
+    elif geometry_upper in ['T', 'TC', 'TOROID']:
+        # Toroids: use rectangular approximation
+        aspect_ratio = 1.0
+    elif geometry_upper in ['U', 'UI', 'UU']:
+        # U-cores: moderate aspect
+        aspect_ratio = 1.3
+    else:
+        # Default: assume moderate aspect ratio
+        aspect_ratio = 1.2
+    
+    # Calculate window dimensions
+    # window_area = height × width
+    # aspect_ratio = height / width
+    # Therefore: width = sqrt(area / aspect_ratio)
+    window_width_cm = math.sqrt(window_area_cm2 / aspect_ratio)
+    window_height_cm = window_area_cm2 / window_width_cm
+    
+    # Account for bobbin margins and safety
+    # Practical winding width ≈ 80-90% of window width
+    margin_factor = 0.85
+    bobbin_width_cm = window_width_cm * margin_factor
+    
+    # Wire effective diameter including insulation (typ. +10%)
+    insulation_factor = 1.1
+    wire_eff_dia_cm = (wire_diameter_mm / 10) * insulation_factor
+    
+    # Calculate turns per layer
+    # Account for packing efficiency and edge spacing
+    turns_per_layer = int(bobbin_width_cm / wire_eff_dia_cm * fill_factor)
+    turns_per_layer = max(1, turns_per_layer)  # At least 1 turn per layer
+    
+    # Calculate number of layers
+    num_layers = math.ceil(num_turns / turns_per_layer)
+    
+    # Layer thickness (wire dia + interlayer insulation)
+    interlayer_insulation_cm = 0.01  # ~0.1mm typical
+    layer_thickness_cm = wire_eff_dia_cm + interlayer_insulation_cm
+    
+    # Sanity check: total layer stack should fit in window height
+    total_stack_height_cm = num_layers * layer_thickness_cm
+    if total_stack_height_cm > window_height_cm * 0.9:
+        # Winding won't fit - adjust calculation or warn
+        # For now, recalculate assuming max layers that fit
+        max_layers = int(window_height_cm * 0.9 / layer_thickness_cm)
+        if max_layers > 0:
+            num_layers = max_layers
+            turns_per_layer = math.ceil(num_turns / num_layers)
+    
+    return {
+        "num_layers": num_layers,
+        "turns_per_layer": turns_per_layer,
+        "bobbin_width_cm": round(bobbin_width_cm, 2),
+        "window_height_cm": round(window_height_cm, 2),
+        "window_width_cm": round(window_width_cm, 2),
+        "layer_thickness_cm": round(layer_thickness_cm, 3),
+        "total_stack_height_cm": round(num_layers * layer_thickness_cm, 2),
+        "fill_factor_used": fill_factor,
+    }
+
+
 def calculate_turns(
     voltage_V: float,
     frequency_Hz: float,

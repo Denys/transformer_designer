@@ -531,21 +531,6 @@
                                             <span v-if="val.status === 'pass'" class="status-pass">✓ Match</span>
                                             <span v-else-if="val.status === 'warning'" class="status-warning">≈
                                                 Close</span>
-                                            <span v-else-if="val.status === 'fail'" class="status-fail">✗ Check</span>
-                                            <span v-else class="status-unknown">? N/A</span>
-                                            <span class="validation-diff">({{ val.difference_percent }}%)</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
 <script setup lang="ts">
 import { useTransformerDesign, type DesignSuggestion, type AlternativeCore } from '~/composables/useTransformerDesign'
 
@@ -584,4 +569,87 @@ function formatValidationKey(key: string): string {
     }
     return names[key] || key.replace(/_/g, ' ')
 }
+
+// Export functions
+async function exportMAS() {
+    if (!result.value) return
+    
+    try {
+        const response = await fetch('/api/export/mas/download', {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                design: result.value,
+                requirements: requirements.value
+            })
+        })
+        
+        if (response.ok) {
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+           const a = document.createElement('a')
+            a.href = url
+            a.download = `transformer_${result.value.core.part_number.replace(/\//g, '-')}_MAS.json`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+    } catch (e) {
+        console.error('Export MAS failed:', e)
+    }
+}
+
+async function exportFEMM() {
+    if (!result.value) return
+    
+    try {
+        const response = await fetch('/api/export/femm/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                design: result.value,
+                requirements: requirements.value
+            })
+        })
+        
+        if (response.ok) {
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `transformer_${result.value.core.part_number.replace(/\//g, '-')}_FEMM.lua`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+    } catch (e) {
+        console.error('Export FEMM failed:', e)
+    }
+}
+
+async function exportJSON() {
+    if (!result.value) return
+    
+    try {
+        const response = await fetch('/api/export/json/download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                design: result.value,
+                requirements: requirements.value
+            })
+        })
+        
+        if (response.ok) {
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `transformer_${result.value.core.part_number.replace(/\//g, '-')}_design.json`
+            a.click()
+            URL.revokeObjectURL(url)
+        }
+    } catch (e) {
+        console.error('Export JSON failed:', e)
+    }
+}
+
 </script>

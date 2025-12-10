@@ -3,10 +3,14 @@ Transformer design API endpoints
 """
 
 import json
+import math
+import logging
 from pathlib import Path
 from typing import List, Optional, Union
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 
 from models.transformer import (
     TransformerRequirements,
@@ -25,6 +29,7 @@ from calculations.ap_method import (
     calculate_area_product,
     waveform_coefficient,
     select_flux_density,
+    calculate_bac_from_waveform,
 )
 from calculations.kg_method import (
     calculate_electrical_coefficient,
@@ -404,6 +409,54 @@ async def design_transformer(requirements: TransformerRequirements):
         
         selected_core_data = suitable_cores[0]  # Pick smallest suitable
         
+        # Calculate missing MLT and At for OpenMagnetics cores if needed
+        source = selected_core_data.get("source", "local")
+        
+        # If MLT or At are missing, calculate them from geometry
+        if source == "openmagnetics" and "MLT_cm" not in selected_core_data:
+            # Import helper if needed
+            try:
+                from integrations.openmagnetics import get_openmagnetics_db
+                om_db = get_openmagnetics_db()
+                
+                # Extract dimensions for calculation
+                Ae_cm2 = selected_core_data["Ae_cm2"]
+                Wa_cm2 = selected_core_data["Wa_cm2"]
+                Ap_cm4 = selected_core_data["Ap_cm4"]
+                geometry = selected_core_data["geometry"]
+                
+                # Better dimension estimation from Ae and Wa
+                # For E-cores: Ae = center_leg_width × depth (square stack)
+                # Wa = window_height × window_width
+                # Typical E-core proportions: depth ≈ center_leg, window_h ≈ 1.5×center_leg
+                center_leg_cm = math.sqrt(Ae_cm2)  # Assume square center leg
+                depth_cm = center_leg_cm
+                
+                # Window proportions (height ≈ 1.5 × width for E-cores)
+                window_height_cm = math.sqrt(Wa_cm2 * 1.5)
+                window_width_cm = Wa_cm2 / window_height_cm if window_height_cm > 0 else math.sqrt(Wa_cm2)
+                
+                width_cm = center_leg_cm + 2 * window_width_cm  # Total core width
+                height_cm = window_height_cm + center_leg_cm * 0.5  # Total height
+                
+                # Calculate MLT
+                MLT_cm = om_db._calculate_MLT(geometry, width_cm, height_cm, depth_cm, Ae_cm2)
+                selected_core_data["MLT_cm"] = round(MLT_cm, 2)
+                
+                # Calculate At
+                At_cm2 = om_db._calculate_surface_area(geometry, width_cm, height_cm, depth_cm, Ap_cm4)
+                selected_core_data["At_cm2"] = round(At_cm2, 2)
+                
+                logger.info(f"Calculated MLT={MLT_cm:.1f}cm, At={At_cm2:.1f}cm² for {geometry} core")
+            except Exception as e:
+                logger.warning(f"Could not calculate MLT/At from geometry: {e}")
+                # Improved fallback estimation from Ae and Wa
+                Ae_cm2 = selected_core_data.get("Ae_cm2", Ap_cm4 ** 0.5)
+                # MLT ≈ perimeter of center leg + bobbin thickness
+                # For square center leg: MLT ≈ 4 × sqrt(Ae) × 1.2 (including bobbin)
+                selected_core_data["MLT_cm"] = 4 * math.sqrt(Ae_cm2) * 1.2
+                selected_core_data["At_cm2"] = calculate_surface_area(Ap_cm4, geometry)
+        
         # Build CoreSelection model
         materials = load_materials()
         mat_data = materials.get(material_type, {}).get(material_grade, {})
@@ -418,15 +471,16 @@ async def design_transformer(requirements: TransformerRequirements):
             Ae_cm2=selected_core_data["Ae_cm2"],
             Wa_cm2=selected_core_data["Wa_cm2"],
             Ap_cm4=selected_core_data["Ap_cm4"],
-            MLT_cm=selected_core_data.get("MLT_cm", 5.0),  # Default for OpenMagnetics cores
-            lm_cm=selected_core_data.get("lm_cm", 5.0),
-            Ve_cm3=selected_core_data.get("Ve_cm3", selected_core_data["Ae_cm2"] * selected_core_data.get("lm_cm", 5.0)),
+            MLT_cm=selected_core_data.get("MLT_cm", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"]) / 10),  # Fallback
+            lm_cm=selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"])),  # Estimate from Ae
+            Ve_cm3=selected_core_data.get("Ve_cm3", selected_core_data["Ae_cm2"] * selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"]))),
             At_cm2=selected_core_data.get("At_cm2", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"])),
-            weight_g=selected_core_data.get("weight_g", 100),  # Default for OpenMagnetics
+            weight_g=selected_core_data.get("weight_g", selected_core_data.get("Ve_cm3", 10) * 4.8),  # Ve × ferrite density
             Bsat_T=selected_core_data.get("Bsat_T", mat_data.get("Bsat_T", 0.4)),
             Bmax_T=Bmax,
             mu_i=selected_core_data.get("mu_i", mat_data.get("mu_i", 2000)),
         )
+
         
         # Step 5: Winding design
         # Primary turns
@@ -447,7 +501,9 @@ async def design_transformer(requirements: TransformerRequirements):
         primary_current_A = Pt / (2 * requirements.primary_voltage_V)  # Approx
         secondary_current_A = requirements.output_power_W / requirements.secondary_voltage_V
         
-        # Wire sizing
+        # Wire sizing - use Litz for HF (> 50 kHz)
+        from calculations.winding import recommend_litz_wire, select_wire_for_frequency
+        
         primary_wire_area = calculate_wire_area(
             primary_current_A,
             requirements.max_current_density_A_cm2
@@ -457,14 +513,37 @@ async def design_transformer(requirements: TransformerRequirements):
             requirements.max_current_density_A_cm2
         )
         
-        primary_wire = select_wire_gauge(
-            primary_wire_area,
-            requirements.frequency_Hz
-        )
-        secondary_wire = select_wire_gauge(
-            secondary_wire_area,
-            requirements.frequency_Hz
-        )
+        # Select wire type based on frequency
+        use_litz_threshold_Hz = 50000  # 50 kHz threshold
+        
+        if requirements.frequency_Hz >= use_litz_threshold_Hz:
+            # High frequency: recommend Litz wire
+            primary_wire = recommend_litz_wire(
+                primary_wire_area,
+                requirements.frequency_Hz,
+                primary_current_A,
+            )
+            secondary_wire = recommend_litz_wire(
+                secondary_wire_area,
+                requirements.frequency_Hz,
+                secondary_current_A,
+            )
+            
+            # If Litz not effective, fall back to solid wire
+            if not primary_wire.get("effective_at_frequency", False):
+                primary_wire = select_wire_gauge(primary_wire_area, requirements.frequency_Hz)
+            if not secondary_wire.get("effective_at_frequency", False):
+                secondary_wire = select_wire_gauge(secondary_wire_area, requirements.frequency_Hz)
+        else:
+            # Low frequency: use solid wire
+            primary_wire = select_wire_gauge(
+                primary_wire_area,
+                requirements.frequency_Hz
+            )
+            secondary_wire = select_wire_gauge(
+                secondary_wire_area,
+                requirements.frequency_Hz
+            )
         
         # DC resistance
         primary_Rdc = calculate_dc_resistance(
@@ -481,8 +560,30 @@ async def design_transformer(requirements: TransformerRequirements):
         )
         
         # AC resistance factors
-        primary_layers = max(1, Np // 20)  # Rough estimate
-        secondary_layers = max(1, Ns // 20)
+        # Calculate number of layers based on bobbin geometry and wire diameter
+        # Import improved layer calculation from winding module
+        from calculations.winding import calculate_layers_from_geometry
+        
+        # Calculate layers using geometry-aware method
+        primary_layer_info = calculate_layers_from_geometry(
+            num_turns=Np,
+            wire_diameter_mm=primary_wire["diameter_mm"],
+            window_area_cm2=core.Wa_cm2,
+            core_geometry=core.geometry,
+        )
+        secondary_layer_info = calculate_layers_from_geometry(
+            num_turns=Ns,
+            wire_diameter_mm=secondary_wire["diameter_mm"],
+            window_area_cm2=core.Wa_cm2,
+            core_geometry=core.geometry,
+        )
+        
+        primary_layers = primary_layer_info["num_layers"]
+        secondary_layers = secondary_layer_info["num_layers"]
+        
+        logger.debug(f"Layer calculation: Pri={primary_layers} layers ({primary_layer_info['turns_per_layer']} tpl), "
+                    f"Sec={secondary_layers} layers ({secondary_layer_info['turns_per_layer']} tpl), "
+                    f"Bobbin width={primary_layer_info['bobbin_width_cm']:.2f}cm")
         
         primary_Fr = calculate_ac_resistance_factor(
             primary_wire["diameter_mm"],
@@ -502,31 +603,60 @@ async def design_transformer(requirements: TransformerRequirements):
             core.Wa_cm2
         )
         
-        winding = WindingDesign(
-            primary_turns=Np,
-            primary_wire_awg=primary_wire["awg"],
-            primary_wire_dia_mm=primary_wire["diameter_mm"],
-            primary_strands=primary_wire["strands"],
-            primary_layers=primary_layers,
-            primary_Rdc_mOhm=primary_Rdc * 1000,
-            primary_Rac_Rdc=primary_Fr,
-            secondary_turns=Ns,
-            secondary_wire_awg=secondary_wire["awg"],
-            secondary_wire_dia_mm=secondary_wire["diameter_mm"],
-            secondary_strands=secondary_wire["strands"],
-            secondary_layers=secondary_layers,
-            secondary_Rdc_mOhm=secondary_Rdc * 1000,
-            secondary_Rac_Rdc=secondary_Fr,
-            total_Ku=window_util["Ku"],
-            Ku_status=window_util["status"],
-        )
+        # Build winding design with Litz metadata if applicable
+        winding_dict = {
+            "primary_turns": Np,
+            "primary_wire_awg": primary_wire.get("awg", primary_wire.get("strand_awg")),
+            "primary_wire_dia_mm": primary_wire.get("diameter_mm", primary_wire.get("outer_diameter_mm")),
+            "primary_strands": primary_wire.get("strands", primary_wire.get("strand_count", 1)),
+            "primary_layers": primary_layers,
+            "primary_Rdc_mOhm": primary_Rdc * 1000,
+            "primary_Rac_Rdc": primary_Fr,
+            "secondary_turns": Ns,
+            "secondary_wire_awg": secondary_wire.get("awg", secondary_wire.get("strand_awg")),
+            "secondary_wire_dia_mm": secondary_wire.get("diameter_mm", secondary_wire.get("outer_diameter_mm")),
+            "secondary_strands": secondary_wire.get("strands", secondary_wire.get("strand_count", 1)),
+            "secondary_layers": secondary_layers,
+            "secondary_Rdc_mOhm": secondary_Rdc * 1000,
+            "secondary_Rac_Rdc": secondary_Fr,
+            "total_Ku": window_util["Ku"],
+            "Ku_status": window_util["status"],
+        }
+        
+        # Add Litz wire metadata if used
+        if primary_wire.get("wire_type") == "litz":
+            winding_dict["primary_wire_type"] = "litz"
+            winding_dict["primary_litz_config"] = {
+                "strand_awg": primary_wire["strand_awg"],
+                "strand_count": primary_wire["strand_count"],
+                "bundle_arrangement": primary_wire["bundle_arrangement"],
+                "ac_factor": primary_wire["ac_factor"],
+            }
+        
+        if secondary_wire.get("wire_type") == "litz":
+            winding_dict["secondary_wire_type"] = "litz"
+            winding_dict["secondary_litz_config"] = {
+                "strand_awg": secondary_wire["strand_awg"],
+                "strand_count": secondary_wire["strand_count"],
+                "bundle_arrangement": secondary_wire["bundle_arrangement"],
+                "ac_factor": secondary_wire["ac_factor"],
+            }
+        
+        winding = WindingDesign(**winding_dict)
         
         # Step 6: Loss analysis
+        # Calculate waveform-aware Bac (not just Bmax/2!)
+        Bac = calculate_bac_from_waveform(
+            Bmax_T=Bmax,
+            waveform=requirements.waveform.value,
+            duty_cycle=0.5,  # Default for transformers
+        )
+        
         # Core loss
         core_loss_W, core_loss_density = calculate_core_loss_steinmetz(
             core.Ve_cm3,
             requirements.frequency_Hz,
-            Bmax / 2,  # Bac = Bm/2 for transformer
+            Bac,  # Use waveform-aware Bac
             material_grade,
             requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
         )
@@ -657,7 +787,7 @@ async def design_transformer(requirements: TransformerRequirements):
             our_loss_W=core_loss_W,
             volume_cm3=core.Ve_cm3,
             frequency_Hz=requirements.frequency_Hz,
-            Bac_T=Bmax / 2,
+            Bac_T=Bac,  # Use calculated Bac, not Bmax/2
             material=material_grade,
             temperature_C=requirements.ambient_temp_C + thermal_data["temperature_rise_C"] / 2,
         )

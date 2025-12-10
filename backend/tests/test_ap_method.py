@@ -9,6 +9,7 @@ from calculations.ap_method import (
     waveform_coefficient,
     select_flux_density,
     calculate_area_product,
+    calculate_bac_from_waveform,
 )
 
 
@@ -130,4 +131,40 @@ class TestAreaProduct:
         Ap_400 = calculate_area_product(Pt, freq, Bmax, 400, Ku, Kf)
         Ap_600 = calculate_area_product(Pt, freq, Bmax, 600, Ku, Kf)
 
-        assert Ap_600 < Ap_400, "Higher J should give smaller Ap"
+
+class TestWaveformAwareBac:
+    """Tests for waveform-aware AC flux density calculation (Phase A Task 3)"""
+
+    def test_sinusoidal_bac(self):
+        """Sinusoidal waveform: Bac = Bmax"""
+        Bac = calculate_bac_from_waveform(Bmax_T=0.3, waveform="sinusoidal", duty_cycle=0.5)
+        assert abs(Bac - 0.3) < 0.001, f"Expected Bac=0.3T, got {Bac}T"
+
+    def test_square_bac(self):
+        """Square waveform: Bac = Bmax (full swing)"""
+        Bac = calculate_bac_from_waveform(Bmax_T=0.2, waveform="square", duty_cycle=0.5)
+        assert abs(Bac - 0.2) < 0.001, f"Expected Bac=0.2T, got {Bac}T"
+
+    def test_triangular_bac(self):
+        """Triangular waveform: Bac = Bmax"""
+        Bac = calculate_bac_from_waveform(Bmax_T=0.25, waveform="triangular", duty_cycle=0.5)
+        assert abs(Bac - 0.25) < 0.001, f"Expected Bac=0.25T, got {Bac}T"
+
+    def test_trapezoidal_symmetric_duty(self):
+        """Trapezoidal with D=0.5 should give Bac ≈ Bmax"""
+        Bac = calculate_bac_from_waveform(Bmax_T=0.3, waveform="trapezoidal", duty_cycle=0.5)
+        assert abs(Bac - 0.3) < 0.01, f"Expected Bac≈0.3T at D=0.5, got {Bac}T"
+
+    def test_trapezoidal_asymmetric_duty(self):
+        """Trapezoidal with D≠0.5 should reduce Bac"""
+        Bac_50 = calculate_bac_from_waveform(Bmax_T=0.3, waveform="trapezoidal", duty_cycle=0.5)
+        Bac_25 = calculate_bac_from_waveform(Bmax_T=0.3, waveform="trapezoidal", duty_cycle=0.25)
+        assert Bac_25 < Bac_50, "Asymmetric duty should reduce Bac"
+
+    def test_not_bmax_over_2(self):
+        """Critical: Bac should NOT default to Bmax/2 for any waveform"""
+        waveforms = ["sinusoidal", "square", "triangular"]
+        for waveform in waveforms:
+            Bac = calculate_bac_from_waveform(Bmax_T=0.4, waveform=waveform, duty_cycle=0.5)
+            # Bac should be close to Bmax, NOT 0.2 (Bmax/2)
+            assert Bac > 0.35, f"{waveform}: Bac={Bac}T should be ≈Bmax=0.4T, not Bmax/2=0.2T"

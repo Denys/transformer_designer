@@ -105,6 +105,8 @@ class WindingDesign(BaseModel):
     primary_layers: int = Field(..., ge=1, description="Number of primary layers")
     primary_Rdc_mOhm: float = Field(..., ge=0, description="Primary DC resistance [mΩ]")
     primary_Rac_Rdc: float = Field(default=1.0, ge=1.0, description="AC/DC resistance ratio")
+    primary_wire_type: Optional[str] = Field(default="solid", description="Wire type: solid or litz")
+    primary_litz_config: Optional[dict] = Field(default=None, description="Litz wire configuration if used")
     
     # Secondary winding
     secondary_turns: int = Field(..., ge=1, description="Secondary turns")
@@ -114,6 +116,8 @@ class WindingDesign(BaseModel):
     secondary_layers: int = Field(..., ge=1, description="Number of secondary layers")
     secondary_Rdc_mOhm: float = Field(..., ge=0, description="Secondary DC resistance [mΩ]")
     secondary_Rac_Rdc: float = Field(default=1.0, ge=1.0, description="AC/DC resistance ratio")
+    secondary_wire_type: Optional[str] = Field(default="solid", description="Wire type: solid or litz")
+    secondary_litz_config: Optional[dict] = Field(default=None, description="Litz wire configuration if used")
     
     # Window utilization
     total_Ku: float = Field(..., ge=0, le=1, description="Total window utilization")

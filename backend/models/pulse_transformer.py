@@ -30,6 +30,7 @@ class PulseApplicationType(str, Enum):
     SIGNAL_ISOLATION = "signal_isolation"
     TRIGGER = "trigger"
     HV_PULSE = "hv_pulse"
+    HV_POWER_PULSE = "hv_power_pulse"  # High-voltage high-current energy transfer (like Dropless)
     ETHERNET = "ethernet"
     TELECOM = "telecom"
     CUSTOM = "custom"
@@ -57,6 +58,14 @@ class PollutionDegree(int, Enum):
     PD1 = 1  # No pollution or only dry, non-conductive pollution
     PD2 = 2  # Normally only non-conductive pollution, occasional condensation
     PD3 = 3  # Conductive pollution or dry non-conductive becoming conductive due to condensation
+
+
+class CoreMaterialType(str, Enum):
+    """Core material type for pulse transformers."""
+    FERRITE = "ferrite"              # For HF gate-drive (f > 10kHz, Bmax ~0.2-0.35T)
+    SILICON_STEEL = "silicon_steel"  # For LF power pulse (f < 1kHz, Bmax ~1.2-1.5T)
+    AMORPHOUS = "amorphous"          # Medium frequency (Bmax ~1.0-1.2T)
+    NANOCRYSTALLINE = "nanocrystalline"  # Wide frequency range (Bmax ~0.8-1.0T)
 
 
 # ============================================================================
@@ -126,7 +135,29 @@ class PulseTransformerRequirements(BaseModel):
     peak_current_A: Optional[float] = Field(
         None,
         gt=0,
-        description="Peak secondary current [A]"
+        description="Peak current [A] - for HV/HC pulse applications"
+    )
+    
+    # Energy-mode parameters (for HV_POWER_PULSE like Dropless)
+    primary_capacitance_uF: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Primary discharge capacitance [µF] - for capacitor discharge mode"
+    )
+    secondary_capacitance_uF: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Secondary load capacitance [µF] - for energy transfer mode"
+    )
+    energy_per_pulse_J: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Required energy per pulse [J]"
+    )
+    pulse_width_ms: Optional[float] = Field(
+        None,
+        gt=0,
+        description="Pulse width [ms] - for millisecond-range pulses"
     )
     
     # Performance requirements
@@ -176,11 +207,15 @@ class PulseTransformerRequirements(BaseModel):
     # Design preferences
     preferred_core_geometry: Optional[str] = Field(
         None,
-        description="Preferred core geometry (RM, EFD, etc.)"
+        description="Preferred core geometry (RM, EFD, EI, toroid, etc.)"
     )
     preferred_material: Optional[str] = Field(
         None,
-        description="Preferred core material"
+        description="Preferred core material grade (N87, M6, etc.)"
+    )
+    core_material_type: Optional[CoreMaterialType] = Field(
+        None,
+        description="Core material type (auto-selected based on frequency if not specified)"
     )
     max_height_mm: Optional[float] = Field(
         None,
@@ -191,6 +226,18 @@ class PulseTransformerRequirements(BaseModel):
         None,
         gt=0,
         description="Maximum PCB footprint [mm²]"
+    )
+    
+    # For HV power pulse: specify turns directly
+    primary_turns: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Fixed primary turns (for HV_POWER_PULSE if specified)"
+    )
+    secondary_turns: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Fixed secondary turns (for HV_POWER_PULSE if specified)"
     )
 
 

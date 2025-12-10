@@ -10,6 +10,8 @@ from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 import logging
 
+from calculations.losses import calculate_Bac_from_waveform
+
 logger = logging.getLogger(__name__)
 
 
@@ -385,11 +387,17 @@ def run_full_validation(
     
     # Core loss validation
     if losses.get("core_loss_W") and core.get("Ve_cm3"):
+        # Calculate Bac based on waveform type (not hardcoded Bmax/2)
+        waveform = requirements.get("waveform", "square")  # Default to square for SMPS
+        duty_cycle = requirements.get("duty_cycle_percent", 50) / 100
+        Bmax = core.get("Bmax_T", 0.1)
+        Bac = calculate_Bac_from_waveform(Bmax, waveform, duty_cycle)
+        
         results["core_loss"] = validate_core_loss(
             our_loss_W=losses["core_loss_W"],
             volume_cm3=core["Ve_cm3"],
             frequency_Hz=requirements.get("frequency_Hz", 100000),
-            Bac_T=core.get("Bmax_T", 0.1) / 2,  # Bac = Bmax/2
+            Bac_T=Bac,
             material=core.get("material", "ferrite"),
             temperature_C=requirements.get("ambient_temp_C", 40) + thermal.get("temperature_rise_C", 40) / 2,
         )

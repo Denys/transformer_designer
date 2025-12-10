@@ -358,10 +358,20 @@ def analyze_pulse_response(
     # BW ≈ 0.35 / tr
     bandwidth_Hz = 0.35 / rise_time if rise_time > 0 else 1e9
     
-    # Damping factor
+    # Damping factor and overshoot
+    # Q < 0.5: overdamped, no overshoot
+    # Q = 0.5: critically damped
+    # Q > 0.5 and Q < 1: underdamped with overshoot
+    # Q >= 1: very underdamped (high overshoot, use limiting form)
     if Llk > 0 and Cw > 0:
         Q = (1 / load_resistance_ohm) * math.sqrt(Llk / Cw)
-        overshoot = 0 if Q < 0.5 else math.exp(-math.pi * Q / math.sqrt(1 - Q**2)) * 100
+        if Q < 0.5:
+            overshoot = 0
+        elif Q < 1:
+            overshoot = math.exp(-math.pi * Q / math.sqrt(1 - Q**2)) * 100
+        else:
+            # Q >= 1: very underdamped, overshoot approaches 100%
+            overshoot = 100 * (1 - 1/Q)  # Approximate
     else:
         overshoot = 0
     
@@ -449,11 +459,19 @@ def calculate_insulation_requirements(
     
     # Determine mains voltage level for table lookup
     mains_levels = [50, 100, 150, 300, 600, 1000]
-    mains_voltage = min(v for v in mains_levels if v >= working_voltage_Vrms * 0.9)
+    # Use max mains level if voltage exceeds all levels
+    matching_levels = [v for v in mains_levels if v >= working_voltage_Vrms * 0.9]
+    mains_voltage = min(matching_levels) if matching_levels else max(mains_levels)
     
     # Get impulse withstand voltage
     key = (mains_voltage, overvoltage_category)
     impulse_kV = IMPULSE_WITHSTAND_KV.get(key, 6.0)
+    
+    # For voltages > 1000V, scale impulse voltage
+    if working_voltage_Vrms > 1000:
+        scale_factor = working_voltage_Vrms / 1000
+        impulse_kV *= scale_factor
+        notes.append(f"High voltage ({working_voltage_Vrms}Vrms): scaled impulse {impulse_kV:.1f}kV")
     
     # Insulation type multipliers
     if insulation_type == "functional":
@@ -474,8 +492,14 @@ def calculate_insulation_requirements(
     
     # Get clearance from table
     clearance_values = sorted(CLEARANCE_TABLE_MM.keys())
-    impulse_for_lookup = min(v for v in clearance_values if v >= impulse_kV)
+    matching_clearances = [v for v in clearance_values if v >= impulse_kV]
+    impulse_for_lookup = min(matching_clearances) if matching_clearances else max(clearance_values)
     clearance_mm = CLEARANCE_TABLE_MM.get(impulse_for_lookup, 8.0)
+    
+    # For impulse > max table value, extrapolate
+    if impulse_kV > max(clearance_values):
+        # Rough rule: ~1mm per kV above 12kV
+        clearance_mm = 14.0 + (impulse_kV - 12.0) * 1.0
     
     # Altitude correction (7% per 1000m above 2000m)
     if altitude_m > 2000:
@@ -488,8 +512,14 @@ def calculate_insulation_requirements(
     
     # Get creepage from table
     creepage_voltages = sorted(CREEPAGE_TABLE_MM.keys())
-    voltage_for_lookup = min(v for v in creepage_voltages if v >= working_voltage_Vrms)
+    matching_creepages = [v for v in creepage_voltages if v >= working_voltage_Vrms]
+    voltage_for_lookup = min(matching_creepages) if matching_creepages else max(creepage_voltages)
     creepage_mm = CREEPAGE_TABLE_MM.get(voltage_for_lookup, 10.0)
+    
+    # For voltages > max table value, extrapolate
+    if working_voltage_Vrms > max(creepage_voltages):
+        # Rough rule: 4mm per 1000V above 2500V
+        creepage_mm = 10.0 + (working_voltage_Vrms - 2500) / 1000 * 4.0
     
     # Material group adjustment
     if material_group == "I":
