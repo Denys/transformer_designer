@@ -279,13 +279,13 @@ def select_flux_density(
             result["Bmax_T"] = 0.30
             result["limitation"] = "saturation_limited"
         elif frequency_Hz <= 100_000:
-            result["Bmax_T"] = 0.20
-            result["limitation"] = "loss_limited"
-        elif frequency_Hz <= 500_000:
             result["Bmax_T"] = 0.10
             result["limitation"] = "loss_limited"
-        else:
+        elif frequency_Hz <= 500_000:
             result["Bmax_T"] = 0.05
+            result["limitation"] = "loss_limited"
+        else:
+            result["Bmax_T"] = 0.03
             result["limitation"] = "loss_limited"
         result["notes"].append("Ferrite: loss increases rapidly with B²·f²")
         

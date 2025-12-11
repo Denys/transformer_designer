@@ -329,7 +329,9 @@ def recommend_litz_wire(
         "strand_count": bundle_size,
         "bundle_arrangement": arrangement,
         "outer_diameter_mm": round(bundle_od_insulated, 2),
+        "diameter_mm": round(bundle_od_insulated, 2),  # Alias for compatibility
         "total_area_cm2": round(total_area_cm2, 6),
+        "area_cm2": round(total_area_cm2, 6),  # Alias for compatibility
         "total_area_mm2": round(total_area_cm2 * 100, 4),
         "Rdc_mOhm_per_m": round(Rdc_per_m_mOhm, 3),
         "ac_factor": round(ac_factor, 3),
@@ -565,23 +567,24 @@ def calculate_layers_from_geometry(
     geometry_upper = core_geometry.upper()
     
     if geometry_upper in ['E', 'EE', 'EI', 'ETD', 'ER', 'EQ', 'EFD', 'EP']:
-        # E-type cores: tall window, aspect ratio ~1.5:1 (H:W)
-        aspect_ratio = 1.5
+        # E-type cores: tall window, aspect ratio ~3:1 (H:W) for winding window
+        # Note: Window width is (E-width - center_leg)/2, height is window_height
+        aspect_ratio = 3.0
     elif geometry_upper in ['PQ', 'PM', 'P', 'POT']:
         # Pot cores: more square window
-        aspect_ratio = 1.2
+        aspect_ratio = 2.5
     elif geometry_upper in ['RM']:
         # RM cores: low profile, wider window
-        aspect_ratio = 0.8
+        aspect_ratio = 2.0
     elif geometry_upper in ['T', 'TC', 'TOROID']:
         # Toroids: use rectangular approximation
         aspect_ratio = 1.0
     elif geometry_upper in ['U', 'UI', 'UU']:
         # U-cores: moderate aspect
-        aspect_ratio = 1.3
+        aspect_ratio = 3.0
     else:
         # Default: assume moderate aspect ratio
-        aspect_ratio = 1.2
+        aspect_ratio = 2.5
     
     # Calculate window dimensions
     # window_area = height × width
@@ -591,17 +594,23 @@ def calculate_layers_from_geometry(
     window_height_cm = window_area_cm2 / window_width_cm
     
     # Account for bobbin margins and safety
-    # Practical winding width ≈ 80-90% of window width
-    margin_factor = 0.85
-    bobbin_width_cm = window_width_cm * margin_factor
+    # Practical winding width ≈ 85-90% of window height (winding is along the height/length of bobbin)
+    # Wait - for E-cores, winding width is the HEIGHT of the window (bobbin length)
+    # The "width" of the window is the build-up depth available
+    
+    # Correct mapping:
+    # Bobbin winding length ≈ window_height
+    # Available build depth ≈ window_width
+    
+    bobbin_winding_length_cm = window_height_cm * 0.9  # 10% margin for flanges
     
     # Wire effective diameter including insulation (typ. +10%)
     insulation_factor = 1.1
     wire_eff_dia_cm = (wire_diameter_mm / 10) * insulation_factor
     
     # Calculate turns per layer
-    # Account for packing efficiency and edge spacing
-    turns_per_layer = int(bobbin_width_cm / wire_eff_dia_cm * fill_factor)
+    # Turns fit along the bobbin length
+    turns_per_layer = int(bobbin_winding_length_cm / wire_eff_dia_cm * 0.95) # 95% linear packing
     turns_per_layer = max(1, turns_per_layer)  # At least 1 turn per layer
     
     # Calculate number of layers
@@ -624,7 +633,7 @@ def calculate_layers_from_geometry(
     return {
         "num_layers": num_layers,
         "turns_per_layer": turns_per_layer,
-        "bobbin_width_cm": round(bobbin_width_cm, 2),
+        "bobbin_width_cm": round(bobbin_winding_length_cm, 2),
         "window_height_cm": round(window_height_cm, 2),
         "window_width_cm": round(window_width_cm, 2),
         "layer_thickness_cm": round(layer_thickness_cm, 3),

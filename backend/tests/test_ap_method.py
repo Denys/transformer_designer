@@ -58,14 +58,14 @@ class TestFluxDensitySelection:
     """Tests for frequency-based flux density selection"""
 
     def test_ferrite_100khz(self):
-        """Ferrite at 100kHz should give Bmax around 0.15-0.25T"""
+        """Ferrite at 100kHz should give Bmax around 0.10-0.25T"""
         result = select_flux_density(100000, "ferrite")
-        assert 0.10 < result["Bmax_T"] < 0.30
+        assert 0.08 <= result["Bmax_T"] <= 0.30
 
     def test_ferrite_500khz(self):
         """Ferrite at 500kHz should give lower Bmax"""
         result = select_flux_density(500000, "ferrite")
-        assert 0.05 < result["Bmax_T"] < 0.15
+        assert 0.03 <= result["Bmax_T"] <= 0.15
 
     def test_silicon_steel_60hz(self):
         """Silicon steel at 60Hz should give Bmax around 1.0-1.5T"""

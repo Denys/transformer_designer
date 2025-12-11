@@ -322,7 +322,7 @@ class OpenMagneticsDB:
             # Typical: MLT ≈ 2*(leg_width + winding_depth)
             # Winding depth ≈ (width - center_leg) / 2
             winding_depth = (width_cm - center_leg_width) / 2 if width_cm > center_leg_width else depth_cm / 3
-            MLT = 2 * (center_leg_width + winding_depth) + 0.4  # 0.4 cm for insulation
+            MLT = 2 * (center_leg_width + winding_depth) * 0.8  # 0.8 factor for winding path
             
         elif shape_upper in ['PQ', 'PM', 'P']:
             # PQ/PM cores: Round center, pot-style
@@ -341,7 +341,7 @@ class OpenMagneticsDB:
             # MLT depends on build-up, estimate from OD-ID
             OD = max(width_cm, depth_cm)
             ID = OD * 0.5  # Typical ID/OD ratio
-            MLT = 2 * (OD - ID) / 2 + height_cm * 0.5
+            MLT = math.pi * (width_cm + depth_cm) / 2
             
         elif shape_upper in ['POT']:
             # Pot cores (cylindrical)
@@ -357,7 +357,7 @@ class OpenMagneticsDB:
             
         else:
             # Default fallback: estimate from Ap
-            MLT = 4 * math.sqrt(math.sqrt(Ae_cm2)) + 1.0
+            MLT = 2 * (width_cm + depth_cm) * 0.9
         
         # Sanity check - MLT should be reasonable
         if MLT < 0.5:
@@ -398,6 +398,7 @@ class OpenMagneticsDB:
         # Check if we have valid dimensions
         if width_cm > 0 and height_cm > 0 and depth_cm > 0:
             # Box surface area (both halves assembled)
+            # At ≈ 2*(W*H + W*D + H*D) for box approximation
             box_surface = 2 * (width_cm * height_cm + width_cm * depth_cm + height_cm * depth_cm)
             
             # Apply shape factor (not all surface is equally exposed)
@@ -421,7 +422,7 @@ class OpenMagneticsDB:
                 At = box_surface * 0.45
             else:
                 # Default
-                At = box_surface * 0.55
+                At = box_surface * 0.60
         else:
             # Fallback: Estimate from Ap using McLyman's approximation
             # At ≈ Ks * Ap^0.5 where Ks depends on core type

@@ -488,3 +488,5 @@ docker-compose.local.yml
 # END OF .GITIGNORE
 # =============================================================================
 GITIGNORE_GUIDE.md
+
+power_transformer_framework_plan.md

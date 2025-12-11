@@ -407,450 +407,493 @@ async def design_transformer(requirements: TransformerRequirements):
                 Kf,
             )
         
-        selected_core_data = suitable_cores[0]  # Pick smallest suitable
+        # Iterate through suitable cores to find one that passes verification
+        best_result = None
         
-        # Calculate missing MLT and At for OpenMagnetics cores if needed
-        source = selected_core_data.get("source", "local")
-        
-        # If MLT or At are missing, calculate them from geometry
-        if source == "openmagnetics" and "MLT_cm" not in selected_core_data:
-            # Import helper if needed
-            try:
-                from integrations.openmagnetics import get_openmagnetics_db
-                om_db = get_openmagnetics_db()
-                
-                # Extract dimensions for calculation
-                Ae_cm2 = selected_core_data["Ae_cm2"]
-                Wa_cm2 = selected_core_data["Wa_cm2"]
-                Ap_cm4 = selected_core_data["Ap_cm4"]
-                geometry = selected_core_data["geometry"]
-                
-                # Better dimension estimation from Ae and Wa
-                # For E-cores: Ae = center_leg_width × depth (square stack)
-                # Wa = window_height × window_width
-                # Typical E-core proportions: depth ≈ center_leg, window_h ≈ 1.5×center_leg
-                center_leg_cm = math.sqrt(Ae_cm2)  # Assume square center leg
-                depth_cm = center_leg_cm
-                
-                # Window proportions (height ≈ 1.5 × width for E-cores)
-                window_height_cm = math.sqrt(Wa_cm2 * 1.5)
-                window_width_cm = Wa_cm2 / window_height_cm if window_height_cm > 0 else math.sqrt(Wa_cm2)
-                
-                width_cm = center_leg_cm + 2 * window_width_cm  # Total core width
-                height_cm = window_height_cm + center_leg_cm * 0.5  # Total height
-                
-                # Calculate MLT
-                MLT_cm = om_db._calculate_MLT(geometry, width_cm, height_cm, depth_cm, Ae_cm2)
-                selected_core_data["MLT_cm"] = round(MLT_cm, 2)
-                
-                # Calculate At
-                At_cm2 = om_db._calculate_surface_area(geometry, width_cm, height_cm, depth_cm, Ap_cm4)
-                selected_core_data["At_cm2"] = round(At_cm2, 2)
-                
-                logger.info(f"Calculated MLT={MLT_cm:.1f}cm, At={At_cm2:.1f}cm² for {geometry} core")
-            except Exception as e:
-                logger.warning(f"Could not calculate MLT/At from geometry: {e}")
-                # Improved fallback estimation from Ae and Wa
-                Ae_cm2 = selected_core_data.get("Ae_cm2", Ap_cm4 ** 0.5)
-                # MLT ≈ perimeter of center leg + bobbin thickness
-                # For square center leg: MLT ≈ 4 × sqrt(Ae) × 1.2 (including bobbin)
-                selected_core_data["MLT_cm"] = 4 * math.sqrt(Ae_cm2) * 1.2
-                selected_core_data["At_cm2"] = calculate_surface_area(Ap_cm4, geometry)
-        
-        # Build CoreSelection model
-        materials = load_materials()
-        mat_data = materials.get(material_type, {}).get(material_grade, {})
-        
-        core = CoreSelection(
-            manufacturer=selected_core_data["manufacturer"],
-            part_number=selected_core_data["part_number"],
-            geometry=selected_core_data["geometry"],
-            material=selected_core_data.get("material", material_grade),
-            source=selected_core_data.get("source", "local"),  # Track database source
-            datasheet_url=selected_core_data.get("datasheet_url", None),  # Include datasheet link if available
-            Ae_cm2=selected_core_data["Ae_cm2"],
-            Wa_cm2=selected_core_data["Wa_cm2"],
-            Ap_cm4=selected_core_data["Ap_cm4"],
-            MLT_cm=selected_core_data.get("MLT_cm", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"]) / 10),  # Fallback
-            lm_cm=selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"])),  # Estimate from Ae
-            Ve_cm3=selected_core_data.get("Ve_cm3", selected_core_data["Ae_cm2"] * selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"]))),
-            At_cm2=selected_core_data.get("At_cm2", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"])),
-            weight_g=selected_core_data.get("weight_g", selected_core_data.get("Ve_cm3", 10) * 4.8),  # Ve × ferrite density
-            Bsat_T=selected_core_data.get("Bsat_T", mat_data.get("Bsat_T", 0.4)),
-            Bmax_T=Bmax,
-            mu_i=selected_core_data.get("mu_i", mat_data.get("mu_i", 2000)),
-        )
-
-        
-        # Step 5: Winding design
-        # Primary turns
-        Np = calculate_turns(
-            requirements.primary_voltage_V,
-            requirements.frequency_Hz,
-            Bmax,
-            core.Ae_cm2,
-            Kf
-        )
-        
-        # Secondary turns
-        turns_ratio = requirements.secondary_voltage_V / requirements.primary_voltage_V
-        Ns = max(1, round(Np * turns_ratio))
-        actual_ratio = Ns / Np
-        
-        # Currents
-        primary_current_A = Pt / (2 * requirements.primary_voltage_V)  # Approx
-        secondary_current_A = requirements.output_power_W / requirements.secondary_voltage_V
-        
-        # Wire sizing - use Litz for HF (> 50 kHz)
-        from calculations.winding import recommend_litz_wire, select_wire_for_frequency
-        
-        primary_wire_area = calculate_wire_area(
-            primary_current_A,
-            requirements.max_current_density_A_cm2
-        )
-        secondary_wire_area = calculate_wire_area(
-            secondary_current_A,
-            requirements.max_current_density_A_cm2
-        )
-        
-        # Select wire type based on frequency
-        use_litz_threshold_Hz = 50000  # 50 kHz threshold
-        
-        if requirements.frequency_Hz >= use_litz_threshold_Hz:
-            # High frequency: recommend Litz wire
-            primary_wire = recommend_litz_wire(
-                primary_wire_area,
-                requirements.frequency_Hz,
-                primary_current_A,
+        # Try up to 5 cores to find a viable design
+        for selected_core_data in suitable_cores[:5]:
+            # Calculate missing MLT and At for OpenMagnetics cores if needed
+            source = selected_core_data.get("source", "local")
+            
+            # If MLT or At are missing, calculate them from geometry
+            if source == "openmagnetics" and "MLT_cm" not in selected_core_data:
+                # Import helper if needed
+                try:
+                    from integrations.openmagnetics import get_openmagnetics_db
+                    om_db = get_openmagnetics_db()
+                    
+                    # Extract dimensions for calculation
+                    Ae_cm2 = selected_core_data["Ae_cm2"]
+                    Wa_cm2 = selected_core_data["Wa_cm2"]
+                    Ap_cm4 = selected_core_data["Ap_cm4"]
+                    geometry = selected_core_data["geometry"]
+                    
+                    # Better dimension estimation from Ae and Wa
+                    # For E-cores: Ae = center_leg_width × depth (square stack)
+                    # Wa = window_height × window_width
+                    # Typical E-core proportions: depth ≈ center_leg, window_h ≈ 1.5×center_leg
+                    center_leg_cm = math.sqrt(Ae_cm2)  # Assume square center leg
+                    depth_cm = center_leg_cm
+                    
+                    # Window proportions (height ≈ 1.5 × width for E-cores)
+                    window_height_cm = math.sqrt(Wa_cm2 * 1.5)
+                    window_width_cm = Wa_cm2 / window_height_cm if window_height_cm > 0 else math.sqrt(Wa_cm2)
+                    
+                    width_cm = center_leg_cm + 2 * window_width_cm  # Total core width
+                    height_cm = window_height_cm + center_leg_cm * 0.5  # Total height
+                    
+                    # Calculate MLT
+                    MLT_cm = om_db._calculate_MLT(geometry, width_cm, height_cm, depth_cm, Ae_cm2)
+                    selected_core_data["MLT_cm"] = round(MLT_cm, 2)
+                    
+                    # Calculate At
+                    At_cm2 = om_db._calculate_surface_area(geometry, width_cm, height_cm, depth_cm, Ap_cm4)
+                    selected_core_data["At_cm2"] = round(At_cm2, 2)
+                    
+                    logger.info(f"Calculated MLT={MLT_cm:.1f}cm, At={At_cm2:.1f}cm² for {geometry} core")
+                except Exception as e:
+                    logger.warning(f"Could not calculate MLT/At from geometry: {e}")
+                    # Improved fallback estimation from Ae and Wa
+                    Ae_cm2 = selected_core_data.get("Ae_cm2", Ap_cm4 ** 0.5)
+                    # MLT ≈ perimeter of center leg + bobbin thickness
+                    # For square center leg: MLT ≈ 4 × sqrt(Ae) × 1.2 (including bobbin)
+                    selected_core_data["MLT_cm"] = 4 * math.sqrt(Ae_cm2) * 1.2
+                    selected_core_data["At_cm2"] = calculate_surface_area(Ap_cm4, geometry)
+            
+            # Build CoreSelection model
+            materials = load_materials()
+            mat_data = materials.get(material_type, {}).get(material_grade, {})
+            
+            core = CoreSelection(
+                manufacturer=selected_core_data["manufacturer"],
+                part_number=selected_core_data["part_number"],
+                geometry=selected_core_data["geometry"],
+                material=selected_core_data.get("material", material_grade),
+                source=selected_core_data.get("source", "local"),  # Track database source
+                datasheet_url=selected_core_data.get("datasheet_url", None),  # Include datasheet link if available
+                Ae_cm2=selected_core_data["Ae_cm2"],
+                Wa_cm2=selected_core_data["Wa_cm2"],
+                Ap_cm4=selected_core_data["Ap_cm4"],
+                MLT_cm=selected_core_data.get("MLT_cm", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"]) / 10),  # Fallback
+                lm_cm=selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"])),  # Estimate from Ae
+                Ve_cm3=selected_core_data.get("Ve_cm3", selected_core_data["Ae_cm2"] * selected_core_data.get("lm_cm", math.sqrt(selected_core_data["Ae_cm2"]))),
+                At_cm2=selected_core_data.get("At_cm2", calculate_surface_area(selected_core_data["Ap_cm4"], selected_core_data["geometry"])),
+                weight_g=selected_core_data.get("weight_g", selected_core_data.get("Ve_cm3", 10) * 4.8),  # Ve × ferrite density
+                Bsat_T=selected_core_data.get("Bsat_T", mat_data.get("Bsat_T", 0.4)),
+                Bmax_T=Bmax,
+                mu_i=selected_core_data.get("mu_i", mat_data.get("mu_i", 2000)),
             )
-            secondary_wire = recommend_litz_wire(
-                secondary_wire_area,
-                requirements.frequency_Hz,
+
+            # Optimization loop for Bmax
+            # If core loss is too high, reduce Bmax and retry
+            current_Bmax = Bmax
+            for _ in range(3): # Try up to 3 Bmax values (100%, 70%, 50%)
+                # Step 5: Winding design
+                # Primary turns
+                Np = calculate_turns(
+                    requirements.primary_voltage_V,
+                    requirements.frequency_Hz,
+                    current_Bmax,
+                    core.Ae_cm2,
+                    Kf
+                )
+            
+            # Secondary turns
+            turns_ratio = requirements.secondary_voltage_V / requirements.primary_voltage_V
+            Ns = max(1, round(Np * turns_ratio))
+            actual_ratio = Ns / Np
+            
+            # Currents
+            primary_current_A = Pt / (2 * requirements.primary_voltage_V)  # Approx
+            secondary_current_A = requirements.output_power_W / requirements.secondary_voltage_V
+            
+            # Wire sizing - use Litz for HF (> 50 kHz)
+            from calculations.winding import recommend_litz_wire, select_wire_for_frequency
+            
+            primary_wire_area = calculate_wire_area(
+                primary_current_A,
+                requirements.max_current_density_A_cm2
+            )
+            secondary_wire_area = calculate_wire_area(
                 secondary_current_A,
+                requirements.max_current_density_A_cm2
             )
             
-            # If Litz not effective, fall back to solid wire
-            if not primary_wire.get("effective_at_frequency", False):
-                primary_wire = select_wire_gauge(primary_wire_area, requirements.frequency_Hz)
-            if not secondary_wire.get("effective_at_frequency", False):
-                secondary_wire = select_wire_gauge(secondary_wire_area, requirements.frequency_Hz)
-        else:
-            # Low frequency: use solid wire
-            primary_wire = select_wire_gauge(
-                primary_wire_area,
-                requirements.frequency_Hz
+            # Select wire type based on frequency
+            use_litz_threshold_Hz = 50000  # 50 kHz threshold
+            
+            if requirements.frequency_Hz >= use_litz_threshold_Hz:
+                # High frequency: recommend Litz wire
+                primary_wire = recommend_litz_wire(
+                    primary_wire_area,
+                    requirements.frequency_Hz,
+                    primary_current_A,
+                )
+                secondary_wire = recommend_litz_wire(
+                    secondary_wire_area,
+                    requirements.frequency_Hz,
+                    secondary_current_A,
+                )
+                
+                # If Litz not effective, fall back to solid wire
+                if not primary_wire.get("effective_at_frequency", False):
+                    primary_wire = select_wire_gauge(primary_wire_area, requirements.frequency_Hz)
+                if not secondary_wire.get("effective_at_frequency", False):
+                    secondary_wire = select_wire_gauge(secondary_wire_area, requirements.frequency_Hz)
+            else:
+                # Low frequency: use solid wire
+                primary_wire = select_wire_gauge(
+                    primary_wire_area,
+                    requirements.frequency_Hz
+                )
+                secondary_wire = select_wire_gauge(
+                    secondary_wire_area,
+                    requirements.frequency_Hz
+                )
+            
+            # DC resistance
+            primary_Rdc = calculate_dc_resistance(
+                Np,
+                core.MLT_cm,
+                primary_wire.get("area_cm2", primary_wire.get("total_area_cm2")),
+                requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
             )
-            secondary_wire = select_wire_gauge(
-                secondary_wire_area,
-                requirements.frequency_Hz
+            secondary_Rdc = calculate_dc_resistance(
+                Ns,
+                core.MLT_cm,
+                secondary_wire.get("area_cm2", secondary_wire.get("total_area_cm2")),
+                requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
             )
-        
-        # DC resistance
-        primary_Rdc = calculate_dc_resistance(
-            Np,
-            core.MLT_cm,
-            primary_wire["area_cm2"],
-            requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
-        )
-        secondary_Rdc = calculate_dc_resistance(
-            Ns,
-            core.MLT_cm,
-            secondary_wire["area_cm2"],
-            requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
-        )
-        
-        # AC resistance factors
-        # Calculate number of layers based on bobbin geometry and wire diameter
-        # Import improved layer calculation from winding module
-        from calculations.winding import calculate_layers_from_geometry
-        
-        # Calculate layers using geometry-aware method
-        primary_layer_info = calculate_layers_from_geometry(
-            num_turns=Np,
-            wire_diameter_mm=primary_wire["diameter_mm"],
-            window_area_cm2=core.Wa_cm2,
-            core_geometry=core.geometry,
-        )
-        secondary_layer_info = calculate_layers_from_geometry(
-            num_turns=Ns,
-            wire_diameter_mm=secondary_wire["diameter_mm"],
-            window_area_cm2=core.Wa_cm2,
-            core_geometry=core.geometry,
-        )
-        
-        primary_layers = primary_layer_info["num_layers"]
-        secondary_layers = secondary_layer_info["num_layers"]
-        
-        logger.debug(f"Layer calculation: Pri={primary_layers} layers ({primary_layer_info['turns_per_layer']} tpl), "
-                    f"Sec={secondary_layers} layers ({secondary_layer_info['turns_per_layer']} tpl), "
-                    f"Bobbin width={primary_layer_info['bobbin_width_cm']:.2f}cm")
-        
-        primary_Fr = calculate_ac_resistance_factor(
-            primary_wire["diameter_mm"],
-            requirements.frequency_Hz,
-            primary_layers
-        )
-        secondary_Fr = calculate_ac_resistance_factor(
-            secondary_wire["diameter_mm"],
-            requirements.frequency_Hz,
-            secondary_layers
-        )
-        
-        # Window utilization
-        window_util = calculate_window_utilization(
-            Np, primary_wire["area_cm2"],
-            Ns, secondary_wire["area_cm2"],
-            core.Wa_cm2
-        )
-        
-        # Build winding design with Litz metadata if applicable
-        winding_dict = {
-            "primary_turns": Np,
-            "primary_wire_awg": primary_wire.get("awg", primary_wire.get("strand_awg")),
-            "primary_wire_dia_mm": primary_wire.get("diameter_mm", primary_wire.get("outer_diameter_mm")),
-            "primary_strands": primary_wire.get("strands", primary_wire.get("strand_count", 1)),
-            "primary_layers": primary_layers,
-            "primary_Rdc_mOhm": primary_Rdc * 1000,
-            "primary_Rac_Rdc": primary_Fr,
-            "secondary_turns": Ns,
-            "secondary_wire_awg": secondary_wire.get("awg", secondary_wire.get("strand_awg")),
-            "secondary_wire_dia_mm": secondary_wire.get("diameter_mm", secondary_wire.get("outer_diameter_mm")),
-            "secondary_strands": secondary_wire.get("strands", secondary_wire.get("strand_count", 1)),
-            "secondary_layers": secondary_layers,
-            "secondary_Rdc_mOhm": secondary_Rdc * 1000,
-            "secondary_Rac_Rdc": secondary_Fr,
-            "total_Ku": window_util["Ku"],
-            "Ku_status": window_util["status"],
-        }
-        
-        # Add Litz wire metadata if used
-        if primary_wire.get("wire_type") == "litz":
-            winding_dict["primary_wire_type"] = "litz"
-            winding_dict["primary_litz_config"] = {
-                "strand_awg": primary_wire["strand_awg"],
-                "strand_count": primary_wire["strand_count"],
-                "bundle_arrangement": primary_wire["bundle_arrangement"],
-                "ac_factor": primary_wire["ac_factor"],
+            
+            # AC resistance factors
+            # Calculate number of layers based on bobbin geometry and wire diameter
+            # Import improved layer calculation from winding module
+            from calculations.winding import calculate_layers_from_geometry
+            
+            # Calculate layers using geometry-aware method
+            primary_layer_info = calculate_layers_from_geometry(
+                num_turns=Np,
+                wire_diameter_mm=primary_wire.get("diameter_mm", primary_wire.get("outer_diameter_mm")),
+                window_area_cm2=core.Wa_cm2,
+                core_geometry=core.geometry,
+            )
+            secondary_layer_info = calculate_layers_from_geometry(
+                num_turns=Ns,
+                wire_diameter_mm=secondary_wire.get("diameter_mm", secondary_wire.get("outer_diameter_mm")),
+                window_area_cm2=core.Wa_cm2,
+                core_geometry=core.geometry,
+            )
+            
+            primary_layers = primary_layer_info["num_layers"]
+            secondary_layers = secondary_layer_info["num_layers"]
+            
+            logger.debug(f"Layer calculation: Pri={primary_layers} layers ({primary_layer_info['turns_per_layer']} tpl), "
+                        f"Sec={secondary_layers} layers ({secondary_layer_info['turns_per_layer']} tpl), "
+                        f"Bobbin width={primary_layer_info['bobbin_width_cm']:.2f}cm")
+            
+            # Calculate AC resistance factor
+            if primary_wire.get("wire_type") == "litz":
+                # For Litz wire, use the pre-calculated factor from design
+                # Adjust for layers if needed, but Litz is designed to minimize this
+                primary_Fr = primary_wire.get("ac_factor", 1.0)
+                # Proximity effect between layers still exists but is reduced
+                # A simple approximation is to add a small factor per layer if > 1
+                if primary_layers > 1:
+                    primary_Fr *= (1 + 0.05 * (primary_layers - 1))
+            else:
+                primary_Fr = calculate_ac_resistance_factor(
+                    primary_wire.get("diameter_mm", primary_wire.get("outer_diameter_mm")),
+                    requirements.frequency_Hz,
+                    primary_layers
+                )
+    
+            if secondary_wire.get("wire_type") == "litz":
+                secondary_Fr = secondary_wire.get("ac_factor", 1.0)
+                if secondary_layers > 1:
+                    secondary_Fr *= (1 + 0.05 * (secondary_layers - 1))
+            else:
+                secondary_Fr = calculate_ac_resistance_factor(
+                    secondary_wire.get("diameter_mm", secondary_wire.get("outer_diameter_mm")),
+                    requirements.frequency_Hz,
+                    secondary_layers
+                )
+            
+            # Window utilization
+            window_util = calculate_window_utilization(
+                Np, primary_wire.get("area_cm2", primary_wire.get("total_area_cm2")),
+                Ns, secondary_wire.get("area_cm2", secondary_wire.get("total_area_cm2")),
+                core.Wa_cm2
+            )
+            
+            # Build winding design with Litz metadata if applicable
+            winding_dict = {
+                "primary_turns": Np,
+                "primary_wire_awg": primary_wire.get("awg", primary_wire.get("strand_awg")),
+                "primary_wire_dia_mm": primary_wire.get("diameter_mm", primary_wire.get("outer_diameter_mm")),
+                "primary_strands": primary_wire.get("strands", primary_wire.get("strand_count", 1)),
+                "primary_layers": primary_layers,
+                "primary_Rdc_mOhm": primary_Rdc * 1000,
+                "primary_Rac_Rdc": primary_Fr,
+                "secondary_turns": Ns,
+                "secondary_wire_awg": secondary_wire.get("awg", secondary_wire.get("strand_awg")),
+                "secondary_wire_dia_mm": secondary_wire.get("diameter_mm", secondary_wire.get("outer_diameter_mm")),
+                "secondary_strands": secondary_wire.get("strands", secondary_wire.get("strand_count", 1)),
+                "secondary_layers": secondary_layers,
+                "secondary_Rdc_mOhm": secondary_Rdc * 1000,
+                "secondary_Rac_Rdc": secondary_Fr,
+                "total_Ku": window_util["Ku"],
+                "Ku_status": window_util["status"],
             }
-        
-        if secondary_wire.get("wire_type") == "litz":
-            winding_dict["secondary_wire_type"] = "litz"
-            winding_dict["secondary_litz_config"] = {
-                "strand_awg": secondary_wire["strand_awg"],
-                "strand_count": secondary_wire["strand_count"],
-                "bundle_arrangement": secondary_wire["bundle_arrangement"],
-                "ac_factor": secondary_wire["ac_factor"],
+            
+            # Add Litz wire metadata if used
+            if primary_wire.get("wire_type") == "litz":
+                winding_dict["primary_wire_type"] = "litz"
+                winding_dict["primary_litz_config"] = {
+                    "strand_awg": primary_wire["strand_awg"],
+                    "strand_count": primary_wire["strand_count"],
+                    "bundle_arrangement": primary_wire["bundle_arrangement"],
+                    "ac_factor": primary_wire["ac_factor"],
+                }
+            
+            if secondary_wire.get("wire_type") == "litz":
+                winding_dict["secondary_wire_type"] = "litz"
+                winding_dict["secondary_litz_config"] = {
+                    "strand_awg": secondary_wire["strand_awg"],
+                    "strand_count": secondary_wire["strand_count"],
+                    "bundle_arrangement": secondary_wire["bundle_arrangement"],
+                    "ac_factor": secondary_wire["ac_factor"],
+                }
+            
+            winding = WindingDesign(**winding_dict)
+            
+            # Step 6: Loss analysis
+            # Calculate waveform-aware Bac (not just Bmax/2!)
+            Bac = calculate_bac_from_waveform(
+                Bmax_T=Bmax,
+                waveform=requirements.waveform.value,
+                duty_cycle=0.5,  # Default for transformers
+            )
+            
+            # Core loss
+            core_loss_W, core_loss_density = calculate_core_loss_steinmetz(
+                core.Ve_cm3,
+                requirements.frequency_Hz,
+                Bac,  # Use waveform-aware Bac
+                material_grade,
+                requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
+            )
+            
+            # Copper losses
+            primary_Pcu = calculate_copper_loss(
+                primary_Rdc,
+                primary_current_A,
+                primary_Fr,
+                requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
+            )
+            secondary_Pcu = calculate_copper_loss(
+                secondary_Rdc,
+                secondary_current_A,
+                secondary_Fr,
+                requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
+            )
+            
+            total_loss_data = calculate_total_losses(
+                core_loss_W,
+                primary_Pcu,
+                secondary_Pcu
+            )
+            
+            efficiency = calculate_efficiency(
+                requirements.output_power_W,
+                total_loss_data["total_loss_W"]
+            )
+            
+            losses = LossAnalysis(
+                core_loss_W=core_loss_W,
+                core_loss_density_mW_cm3=core_loss_density,
+                primary_copper_loss_W=primary_Pcu,
+                secondary_copper_loss_W=secondary_Pcu,
+                total_copper_loss_W=total_loss_data["total_copper_loss_W"],
+                total_loss_W=total_loss_data["total_loss_W"],
+                efficiency_percent=efficiency,
+                Pfe_Pcu_ratio=total_loss_data["Pfe_Pcu_ratio"],
+            )
+            
+            # Step 7: Thermal analysis
+            thermal_data = thermal_analysis(
+                total_loss_data["total_loss_W"],
+                core.At_cm2,
+                requirements.ambient_temp_C,
+                requirements.max_temp_rise_C,
+                requirements.cooling,
+                material_max_temp_C=120 if material_type == "ferrite" else 150
+            )
+            
+            thermal = ThermalAnalysis(
+                power_dissipation_density_W_cm2=thermal_data["power_dissipation_density_W_cm2"],
+                temperature_rise_C=thermal_data["temperature_rise_C"],
+                hotspot_temp_C=thermal_data["hotspot_temp_C"],
+                thermal_margin_C=thermal_data["margin_to_target_C"],
+                thermal_status=thermal_data["status"].replace("error", "fail").replace("ok", "pass"),
+                cooling_recommendation=thermal_data["cooling_recommendation"],
+            )
+            
+            # Verification
+            warnings = []
+            errors = []
+            recommendations = thermal_data.get("recommendations", [])
+            
+            # Check window utilization
+            if window_util["status"] == "error":
+                errors.append(f"Window overfill: Ku = {window_util['Ku']:.2f} > 0.6")
+            elif window_util["status"] == "warning":
+                warnings.append(f"Window fill marginal: Ku = {window_util['Ku']:.2f}")
+            
+            # Check thermal
+            if thermal_data["status"] == "error":
+                errors.append(f"Thermal limit exceeded: Tr = {thermal_data['temperature_rise_C']:.1f}°C")
+            elif thermal_data["status"] == "warning":
+                warnings.append(f"Thermal margin low: {thermal_data['margin_to_target_C']:.1f}°C")
+            
+            # Check efficiency
+            if efficiency < requirements.efficiency_percent:
+                warnings.append(f"Efficiency {efficiency:.1f}% below target {requirements.efficiency_percent}%")
+            
+            # Check flux density margin
+            Bmax_margin = (core.Bsat_T - Bmax) / core.Bsat_T * 100
+            if Bmax_margin < 15:
+                warnings.append(f"Low saturation margin: {Bmax_margin:.1f}% below Bsat")
+            
+            # Convert ok/warning/error to pass/warning/fail
+            def convert_status(s: str) -> str:
+                return s.replace("ok", "pass").replace("error", "fail")
+            
+            verification = VerificationStatus(
+                electrical="pass" if not any("efficiency" in w.lower() for w in warnings + errors) else "warning",
+                mechanical=convert_status(window_util["status"]),
+                thermal=convert_status(thermal_data["status"]),
+                warnings=warnings,
+                errors=errors,
+                recommendations=recommendations,
+            )
+            
+            # Design viability
+            design_viable = len(errors) == 0
+            confidence_score = 0.9 if design_viable and len(warnings) == 0 else (0.7 if design_viable else 0.3)
+            
+            # Get alternative cores (up to 3 others that also work)
+            alternative_cores = []
+            for alt_core in suitable_cores[1:4]:  # Skip first (selected), take next 3
+                alternative_cores.append({
+                    "part_number": alt_core.get("part_number"),
+                    "manufacturer": alt_core.get("manufacturer"),
+                    "geometry": alt_core.get("geometry"),
+                    "material": alt_core.get("material", "N87"),
+                    "Ap_cm4": alt_core.get("Ap_cm4"),
+                    "source": alt_core.get("source", "local"),
+                    "datasheet_url": alt_core.get("datasheet_url"),
+                })
+            
+            # Method names for display
+            method_names = {
+                "Ap": "McLyman Ap (Area Product)",
+                "Kg": "McLyman Kg (Regulation)",
+                "Kgfe": "Erickson Kgfe (Loss Optimized)",
             }
+            
+            # Run validation against reference data
+            validation_results = {}
+            
+            # Core loss validation
+            core_loss_val = validate_core_loss(
+                our_loss_W=core_loss_W,
+                volume_cm3=core.Ve_cm3,
+                frequency_Hz=requirements.frequency_Hz,
+                Bac_T=Bac,  # Use calculated Bac, not Bmax/2
+                material=material_grade,
+                temperature_C=requirements.ambient_temp_C + thermal_data["temperature_rise_C"] / 2,
+            )
+            validation_results["core_loss"] = {
+                "our_value": round(core_loss_val.our_value, 2),
+                "reference_value": round(core_loss_val.reference_value, 2),
+                "difference_percent": round(core_loss_val.difference_percent, 1),
+                "status": core_loss_val.status,
+                "confidence": core_loss_val.confidence,
+                "unit": "mW/cm³",
+            }
+            
+            # Efficiency validation
+            eff_val = validate_efficiency(
+                calculated_efficiency=efficiency,
+                output_power_W=requirements.output_power_W,
+                frequency_Hz=requirements.frequency_Hz,
+                core_volume_cm3=core.Ve_cm3,
+            )
+            validation_results["efficiency"] = {
+                "our_value": round(eff_val.our_value, 1),
+                "reference_value": round(eff_val.reference_value, 1),
+                "difference_percent": round(eff_val.difference_percent, 1),
+                "status": eff_val.status,
+                "confidence": eff_val.confidence,
+                "unit": "%",
+            }
+            
+            # Temperature rise validation
+            temp_val = validate_temperature_rise(
+                calculated_rise_C=thermal_data["temperature_rise_C"],
+                power_dissipation_W=total_loss_data["total_loss_W"],
+                surface_area_cm2=core.At_cm2,
+                cooling=requirements.cooling,
+            )
+            validation_results["temperature_rise"] = {
+                "our_value": round(temp_val.our_value, 1),
+                "reference_value": round(temp_val.reference_value, 1),
+                "difference_percent": round(temp_val.difference_percent, 1),
+                "status": temp_val.status,
+                "confidence": temp_val.confidence,
+                "unit": "°C",
+            }
+            
+            result = TransformerDesignResult(
+                design_method=design_method,
+                design_method_name=method_names.get(design_method, "McLyman Ap"),
+                calculated_Ap_cm4=Ap,
+                calculated_Kg_cm5=Kg,
+                optimal_Pfe_Pcu_ratio=1.375 if design_method == "Kgfe" else None,  # β/2 for β=2.75
+                core=core,
+                alternative_cores=alternative_cores,
+                winding=winding,
+                turns_ratio=actual_ratio,
+                magnetizing_inductance_uH=None,  # Could calculate if needed
+                leakage_inductance_uH=None,
+                losses=losses,
+                thermal=thermal,
+                verification=verification,
+                validation=validation_results,
+                design_viable=design_viable,
+                confidence_score=confidence_score,
+            )
+            
+            # Keep track of the best result so far (highest confidence)
+            # Update this BEFORE checking for optimization/continue, so we always have a result
+            if best_result is None or result.confidence_score > best_result.confidence_score:
+                best_result = result
+
+            # If design is viable, return it immediately
+            if design_viable:
+                return result
+            
+            # Check if we should optimize Bmax
+            # If thermal fail and core dominated, reduce Bmax
+            if thermal.thermal_status == "fail" and losses.Pfe_Pcu_ratio > 2.0:
+                current_Bmax *= 0.7 # Reduce Bmax by 30%
+                continue # Retry with new Bmax
+            
+            # If we get here, we are moving to next core, so break Bmax loop
+            break
         
-        winding = WindingDesign(**winding_dict)
-        
-        # Step 6: Loss analysis
-        # Calculate waveform-aware Bac (not just Bmax/2!)
-        Bac = calculate_bac_from_waveform(
-            Bmax_T=Bmax,
-            waveform=requirements.waveform.value,
-            duty_cycle=0.5,  # Default for transformers
-        )
-        
-        # Core loss
-        core_loss_W, core_loss_density = calculate_core_loss_steinmetz(
-            core.Ve_cm3,
-            requirements.frequency_Hz,
-            Bac,  # Use waveform-aware Bac
-            material_grade,
-            requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
-        )
-        
-        # Copper losses
-        primary_Pcu = calculate_copper_loss(
-            primary_Rdc,
-            primary_current_A,
-            primary_Fr,
-            requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
-        )
-        secondary_Pcu = calculate_copper_loss(
-            secondary_Rdc,
-            secondary_current_A,
-            secondary_Fr,
-            requirements.ambient_temp_C + requirements.max_temp_rise_C / 2
-        )
-        
-        total_loss_data = calculate_total_losses(
-            core_loss_W,
-            primary_Pcu,
-            secondary_Pcu
-        )
-        
-        efficiency = calculate_efficiency(
-            requirements.output_power_W,
-            total_loss_data["total_loss_W"]
-        )
-        
-        losses = LossAnalysis(
-            core_loss_W=core_loss_W,
-            core_loss_density_mW_cm3=core_loss_density,
-            primary_copper_loss_W=primary_Pcu,
-            secondary_copper_loss_W=secondary_Pcu,
-            total_copper_loss_W=total_loss_data["total_copper_loss_W"],
-            total_loss_W=total_loss_data["total_loss_W"],
-            efficiency_percent=efficiency,
-            Pfe_Pcu_ratio=total_loss_data["Pfe_Pcu_ratio"],
-        )
-        
-        # Step 7: Thermal analysis
-        thermal_data = thermal_analysis(
-            total_loss_data["total_loss_W"],
-            core.At_cm2,
-            requirements.ambient_temp_C,
-            requirements.max_temp_rise_C,
-            requirements.cooling,
-            material_max_temp_C=120 if material_type == "ferrite" else 150
-        )
-        
-        thermal = ThermalAnalysis(
-            power_dissipation_density_W_cm2=thermal_data["power_dissipation_density_W_cm2"],
-            temperature_rise_C=thermal_data["temperature_rise_C"],
-            hotspot_temp_C=thermal_data["hotspot_temp_C"],
-            thermal_margin_C=thermal_data["margin_to_target_C"],
-            thermal_status=thermal_data["status"].replace("error", "fail").replace("ok", "pass"),
-            cooling_recommendation=thermal_data["cooling_recommendation"],
-        )
-        
-        # Verification
-        warnings = []
-        errors = []
-        recommendations = thermal_data.get("recommendations", [])
-        
-        # Check window utilization
-        if window_util["status"] == "error":
-            errors.append(f"Window overfill: Ku = {window_util['Ku']:.2f} > 0.6")
-        elif window_util["status"] == "warning":
-            warnings.append(f"Window fill marginal: Ku = {window_util['Ku']:.2f}")
-        
-        # Check thermal
-        if thermal_data["status"] == "error":
-            errors.append(f"Thermal limit exceeded: Tr = {thermal_data['temperature_rise_C']:.1f}°C")
-        elif thermal_data["status"] == "warning":
-            warnings.append(f"Thermal margin low: {thermal_data['margin_to_target_C']:.1f}°C")
-        
-        # Check efficiency
-        if efficiency < requirements.efficiency_percent:
-            warnings.append(f"Efficiency {efficiency:.1f}% below target {requirements.efficiency_percent}%")
-        
-        # Check flux density margin
-        Bmax_margin = (core.Bsat_T - Bmax) / core.Bsat_T * 100
-        if Bmax_margin < 15:
-            warnings.append(f"Low saturation margin: {Bmax_margin:.1f}% below Bsat")
-        
-        # Convert ok/warning/error to pass/warning/fail
-        def convert_status(s: str) -> str:
-            return s.replace("ok", "pass").replace("error", "fail")
-        
-        verification = VerificationStatus(
-            electrical="pass" if not any("efficiency" in w.lower() for w in warnings + errors) else "warning",
-            mechanical=convert_status(window_util["status"]),
-            thermal=convert_status(thermal_data["status"]),
-            warnings=warnings,
-            errors=errors,
-            recommendations=recommendations,
-        )
-        
-        # Design viability
-        design_viable = len(errors) == 0
-        confidence_score = 0.9 if design_viable and len(warnings) == 0 else (0.7 if design_viable else 0.3)
-        
-        # Get alternative cores (up to 3 others that also work)
-        alternative_cores = []
-        for alt_core in suitable_cores[1:4]:  # Skip first (selected), take next 3
-            alternative_cores.append({
-                "part_number": alt_core.get("part_number"),
-                "manufacturer": alt_core.get("manufacturer"),
-                "geometry": alt_core.get("geometry"),
-                "material": alt_core.get("material", "N87"),
-                "Ap_cm4": alt_core.get("Ap_cm4"),
-                "source": alt_core.get("source", "local"),
-                "datasheet_url": alt_core.get("datasheet_url"),
-            })
-        
-        # Method names for display
-        method_names = {
-            "Ap": "McLyman Ap (Area Product)",
-            "Kg": "McLyman Kg (Regulation)",
-            "Kgfe": "Erickson Kgfe (Loss Optimized)",
-        }
-        
-        # Run validation against reference data
-        validation_results = {}
-        
-        # Core loss validation
-        core_loss_val = validate_core_loss(
-            our_loss_W=core_loss_W,
-            volume_cm3=core.Ve_cm3,
-            frequency_Hz=requirements.frequency_Hz,
-            Bac_T=Bac,  # Use calculated Bac, not Bmax/2
-            material=material_grade,
-            temperature_C=requirements.ambient_temp_C + thermal_data["temperature_rise_C"] / 2,
-        )
-        validation_results["core_loss"] = {
-            "our_value": round(core_loss_val.our_value, 2),
-            "reference_value": round(core_loss_val.reference_value, 2),
-            "difference_percent": round(core_loss_val.difference_percent, 1),
-            "status": core_loss_val.status,
-            "confidence": core_loss_val.confidence,
-            "unit": "mW/cm³",
-        }
-        
-        # Efficiency validation
-        eff_val = validate_efficiency(
-            calculated_efficiency=efficiency,
-            output_power_W=requirements.output_power_W,
-            frequency_Hz=requirements.frequency_Hz,
-            core_volume_cm3=core.Ve_cm3,
-        )
-        validation_results["efficiency"] = {
-            "our_value": round(eff_val.our_value, 1),
-            "reference_value": round(eff_val.reference_value, 1),
-            "difference_percent": round(eff_val.difference_percent, 1),
-            "status": eff_val.status,
-            "confidence": eff_val.confidence,
-            "unit": "%",
-        }
-        
-        # Temperature rise validation
-        temp_val = validate_temperature_rise(
-            calculated_rise_C=thermal_data["temperature_rise_C"],
-            power_dissipation_W=total_loss_data["total_loss_W"],
-            surface_area_cm2=core.At_cm2,
-            cooling=requirements.cooling,
-        )
-        validation_results["temperature_rise"] = {
-            "our_value": round(temp_val.our_value, 1),
-            "reference_value": round(temp_val.reference_value, 1),
-            "difference_percent": round(temp_val.difference_percent, 1),
-            "status": temp_val.status,
-            "confidence": temp_val.confidence,
-            "unit": "°C",
-        }
-        
-        return TransformerDesignResult(
-            design_method=design_method,
-            design_method_name=method_names.get(design_method, "McLyman Ap"),
-            calculated_Ap_cm4=Ap,
-            calculated_Kg_cm5=Kg,
-            optimal_Pfe_Pcu_ratio=1.375 if design_method == "Kgfe" else None,  # β/2 for β=2.75
-            core=core,
-            alternative_cores=alternative_cores,
-            winding=winding,
-            turns_ratio=actual_ratio,
-            magnetizing_inductance_uH=None,  # Could calculate if needed
-            leakage_inductance_uH=None,
-            losses=losses,
-            thermal=thermal,
-            verification=verification,
-            validation=validation_results,
-            design_viable=design_viable,
-            confidence_score=confidence_score,
-        )
+        # If no viable design found after trying multiple cores, return the best attempt
+        return best_result
         
     except HTTPException:
         raise
@@ -961,4 +1004,3 @@ async def validate_design_endpoint(
         }
         for name, v in validations.items()
     }
-
