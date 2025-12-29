@@ -14,11 +14,16 @@ Enhanced Features:
 """
 
 import math
-import PyMKF
 from typing import Optional, List, Dict, Any, Tuple
 from functools import lru_cache
 from dataclasses import dataclass
 import logging
+
+# Optional import of PyMKF
+try:
+    import PyMKF
+except ImportError:
+    PyMKF = None
 
 logger = logging.getLogger(__name__)
 

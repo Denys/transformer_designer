@@ -9,7 +9,6 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
     "numpy>=1.26.0",
-    "pymkf>=0.9.45",
 ]
 
 [project.optional-dependencies]
