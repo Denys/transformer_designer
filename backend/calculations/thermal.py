@@ -234,3 +234,100 @@ DISSIPATION_TARGETS = {
     (40, "forced"): 0.10,
     (65, "forced"): 0.15,
 }
+
+
+def thermal_mass_estimate(
+    core_weight_kg: float,
+    copper_weight_kg: float,
+    specific_heat_core: float = 450,    # J/kg·°C (Si-steel)
+    specific_heat_copper: float = 385   # J/kg·°C
+) -> float:
+    """
+    Estimate thermal mass for transient calculations.
+
+    Args:
+        core_weight_kg: Core weight [kg]
+        copper_weight_kg: Copper weight [kg]
+        specific_heat_core: Specific heat of core [J/kg·°C]
+        specific_heat_copper: Specific heat of copper [J/kg·°C]
+
+    Returns:
+        Thermal mass [J/°C]
+    """
+    c_th = (core_weight_kg * specific_heat_core) + (copper_weight_kg * specific_heat_copper)
+    return c_th
+
+
+def thermal_pulsed_operation(
+    peak_power: float,            # W (instantaneous)
+    average_power: float,         # W (time-averaged)
+    pulse_width: float,           # seconds
+    duty_cycle: float,            # fraction
+    thermal_mass: float,          # J/°C (copper + core)
+    thermal_resistance: float     # °C/W (to ambient)
+) -> dict:
+    """
+    Calculate temperature for pulsed operation.
+
+    Two thermal time constants:
+    1. τ_pulse: heating during pulse (thermal mass limited)
+    2. τ_avg: steady-state (thermal resistance limited)
+
+    Args:
+        peak_power: Peak power dissipation [W]
+        average_power: Average power dissipation [W]
+        pulse_width: Pulse width [s]
+        duty_cycle: Duty cycle (0-1)
+        thermal_mass: Thermal mass [J/°C]
+        thermal_resistance: Thermal resistance [°C/W]
+
+    Returns:
+        Dictionary with temperature rise estimates
+    """
+    # Steady state rise based on average power
+    temp_rise_average = average_power * thermal_resistance
+
+    # Transient rise during a single pulse (adiabatic assumption for short pulse)
+    # Energy = P_peak * t_pulse
+    # dQ = C_th * dT -> dT = Energy / C_th
+    energy_per_pulse = peak_power * pulse_width
+    temp_rise_pulse = energy_per_pulse / thermal_mass if thermal_mass > 0 else 0
+
+    # Peak temperature rise (Average + Ripple)
+    # Actually, the ripple is superimposed on the average.
+    # The peak is roughly Avg + dT_pulse/2 (sawtooth approx)
+    # But if duty is very low, it cools down significantly between pulses.
+
+    temp_peak = temp_rise_average + temp_rise_pulse
+
+    return {
+        "temp_rise_average_C": temp_rise_average,
+        "temp_rise_pulse_C": temp_rise_pulse,
+        "temp_peak_rise_C": temp_peak,
+        "energy_per_pulse_J": energy_per_pulse,
+        "thermal_time_constant_s": thermal_mass * thermal_resistance if thermal_resistance > 0 else 0
+    }
+
+
+def natural_convection_rating(
+    surface_area_cm2: float,
+    max_temp_rise: float,
+    ambient_temp: float = 40
+) -> float:
+    """
+    Calculate power dissipation capability with natural convection.
+
+    Args:
+        surface_area_cm2: Surface area [cm²]
+        max_temp_rise: Maximum temperature rise [°C]
+        ambient_temp: Ambient temperature [°C]
+
+    Returns:
+        Max power capability [W]
+    """
+    # Based on McLyman: Tr = 450 * psi^0.826
+    # psi = (Tr/450)^(1/0.826)
+
+    psi = (max_temp_rise / 450) ** (1 / 0.826)
+
+    return psi * surface_area_cm2

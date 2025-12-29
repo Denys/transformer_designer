@@ -390,18 +390,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pymkf"
-version = "0.9.45"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ef/9f/e907a1400e4caa47c95ea66d269231106cb3ec4898783f5461f97c5dcb5c/pymkf-0.9.45-cp311-cp311-win_amd64.whl", hash = "sha256:12dfd991a0d81a81be0c7a5d524d6d8ea2481137b5e9e636597da72aff421999", size = 3825473, upload-time = "2025-11-21T00:25:59.674Z" },
-    { url = "https://files.pythonhosted.org/packages/d3/6c/738f39d4a1a3b735c3c892b05f15bcdb974736a3f8ffb78527ee42989382/pymkf-0.9.45-cp312-cp312-win_amd64.whl", hash = "sha256:14b3558d98f7b3220919eef42e1cff0e57ba971970c8243d3c32d2b42ed2cf09", size = 3826020, upload-time = "2025-11-21T00:26:01.643Z" },
-    { url = "https://files.pythonhosted.org/packages/fb/3e/c64f0799c5beaaa042390d0380d7589aafaf855efc596802bcf5fee78097/pymkf-0.9.45-cp313-cp313-win_amd64.whl", hash = "sha256:9bd1e97f26443325ffa2317ec06936758db114442e456e9741aab6c0e429674b", size = 3826238, upload-time = "2025-11-21T00:26:03.367Z" },
-    { url = "https://files.pythonhosted.org/packages/30/ce/4e7b1a1c2014c1a94339588e8bbe5fc992d5fdca133536732a3c988bee2a/pymkf-0.9.45-cp314-cp314-win_amd64.whl", hash = "sha256:b12c99e97da40a5586e95c82aad4c2ab7d0795fe966bb5085e60011fd5991f99", size = 3870543, upload-time = "2025-11-30T21:00:46.076Z" },
-    { url = "https://files.pythonhosted.org/packages/d5/d9/56d586a80d407c8c32bfc5b1f81425943a14c25cf07b20c0b47507a45274/pymkf-0.9.45-cp314-cp314t-win_amd64.whl", hash = "sha256:e82ea89bbe143dcc5eac4487169195ea7ceb70aaa2a3bdd648a92d96d08e6c0a", size = 3879855, upload-time = "2025-11-30T21:00:51.175Z" },
-]
-
-[[package]]
 name = "pytest"
 version = "9.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -515,7 +503,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "numpy" },
     { name = "pydantic" },
-    { name = "pymkf" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -539,7 +526,6 @@ requires-dist = [
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.25.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "pydantic", specifier = ">=2.5.0" },
-    { name = "pymkf", specifier = ">=0.9.45" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.24.0" },

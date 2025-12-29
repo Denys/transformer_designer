@@ -849,3 +849,198 @@ def calculate_window_utilization(
         "total_with_insulation_cm2": total_copper,
         "status": status,
     }
+
+
+def effective_frequency_pulse(rise_time_s: float) -> float:
+    """
+    Calculate effective frequency for skin depth calculations in pulse transformers.
+
+    For pulse waveforms, the skin effect is determined by the high-frequency
+    components associated with the rise time.
+
+    f_eff ≈ 0.35 / t_rise
+
+    Args:
+        rise_time_s: Rise time (10-90%) [s]
+
+    Returns:
+        Effective frequency [Hz]
+    """
+    if rise_time_s <= 0:
+        return 0
+    return 0.35 / rise_time_s
+
+
+def wire_selection_high_current(
+    current_peak_A: float,
+    current_rms_A: float,
+    frequency_Hz: float,
+    current_density_A_cm2: float = 400,
+    max_layers: int = 3
+) -> dict:
+    """
+    Select appropriate conductor type for high-current applications.
+
+    Evaluates round wire, Litz wire, and copper foil.
+
+    Args:
+        current_peak_A: Peak current [A]
+        current_rms_A: RMS current [A]
+        frequency_Hz: Operating/effective frequency [Hz]
+        current_density_A_cm2: Target current density [A/cm²]
+        max_layers: Maximum desired layers
+
+    Returns:
+        Dictionary with recommendation
+    """
+    # Calculate required area
+    required_area_cm2 = current_rms_A / current_density_A_cm2
+    required_area_mm2 = required_area_cm2 * 100
+
+    skin_depth_mm = calculate_skin_depth(frequency_Hz)
+
+    recommendations = []
+
+    # Check 1: Round wire (single or parallel)
+    # Max wire diameter should be < 2*skin_depth
+    max_wire_dia_mm = 2 * skin_depth_mm
+
+    # Calculate equivalent single wire diameter
+    equiv_dia_mm = math.sqrt(4 * required_area_mm2 / math.pi)
+
+    if equiv_dia_mm <= max_wire_dia_mm:
+        # Single wire is fine
+        awg = mm_to_awg(equiv_dia_mm)
+        recommendations.append({
+            "type": "round",
+            "description": f"Single AWG {awg} wire",
+            "parallels": 1,
+            "awg": awg
+        })
+    else:
+        # Need parallel wires
+        # Use wire with diameter ≈ 1.5 * skin_depth
+        target_dia_mm = 1.5 * skin_depth_mm
+        target_awg = mm_to_awg(target_dia_mm)
+        single_area_mm2 = awg_to_mm(target_awg)[1]
+        parallels = math.ceil(required_area_mm2 / single_area_mm2)
+
+        recommendations.append({
+            "type": "round_parallel",
+            "description": f"{parallels}x Parallel AWG {target_awg}",
+            "parallels": parallels,
+            "awg": target_awg
+        })
+
+    # Check 2: Foil
+    # Foil is good for high current if window width allows
+    # Foil thickness should be <= 2*skin_depth (or <= skin_depth for low loss)
+    foil_thickness_opt_mm = min(0.5, skin_depth_mm) # Practical limit ~0.5mm usually
+    foil_width_mm = required_area_mm2 / foil_thickness_opt_mm
+
+    recommendations.append({
+        "type": "foil",
+        "description": f"Copper foil {foil_thickness_opt_mm:.3f}mm thick x {foil_width_mm:.1f}mm wide",
+        "thickness_mm": foil_thickness_opt_mm,
+        "width_mm": foil_width_mm
+    })
+
+    # Check 3: Litz
+    # Only if frequency is high (>20kHz)
+    if frequency_Hz > 20000:
+        litz = recommend_litz_wire(required_area_cm2, frequency_Hz)
+        recommendations.append({
+            "type": "litz",
+            "description": f"Litz wire {litz['strand_count']}x AWG {litz['strand_awg']}",
+            "details": litz
+        })
+
+    # Select best option
+    # Rule of thumb logic:
+    # - If current > 20A and frequency < 100kHz -> Foil often best
+    # - If frequency > 100kHz -> Litz best
+    # - Low current -> Round
+
+    best_option = recommendations[0]
+    if current_rms_A > 20 and frequency_Hz < 100000:
+         best_option = next((r for r in recommendations if r["type"] == "foil"), best_option)
+    elif frequency_Hz >= 100000:
+         best_option = next((r for r in recommendations if r["type"] == "litz"), best_option)
+
+    return {
+        "recommended": best_option,
+        "alternatives": recommendations,
+        "skin_depth_mm": skin_depth_mm,
+        "required_area_mm2": required_area_mm2
+    }
+
+
+def foil_winding_design(
+    current_rms: float,
+    current_density: float,
+    bobbin_winding_width_mm: float,
+    frequency_Hz: float,
+    margin_mm: float = 2.0
+) -> dict:
+    """
+    Calculate copper foil winding parameters.
+
+    Args:
+        current_rms: RMS current [A]
+        current_density: Target current density [A/cm²]
+        bobbin_winding_width_mm: Available width on bobbin [mm]
+        frequency_Hz: Frequency [Hz]
+        margin_mm: Safety margin on each side [mm]
+
+    Returns:
+        Foil design parameters
+    """
+    max_foil_width_mm = bobbin_winding_width_mm - (2 * margin_mm)
+
+    if max_foil_width_mm <= 0:
+        return {"feasible": False, "reason": "Bobbin too narrow for margins"}
+
+    required_area_mm2 = (current_rms / current_density) * 100
+
+    # Required thickness = Area / Width
+    required_thickness_mm = required_area_mm2 / max_foil_width_mm
+
+    # Check skin depth
+    skin_depth_mm = calculate_skin_depth(frequency_Hz)
+
+    # If thickness > 2*skin_depth, AC resistance increases significantly
+    ac_resistance_factor = 1.0
+    if required_thickness_mm > 2 * skin_depth_mm:
+        # Approximation for foil AC resistance
+        # Fr = h / delta * ... (complex formula)
+        # Simplified:
+        ratio = required_thickness_mm / skin_depth_mm
+        ac_resistance_factor = ratio * 0.5 + 0.5 # Very rough linear approx
+
+    # Practical foil thicknesses
+    standard_foils = [0.025, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5]
+
+    # Find closest standard thickness >= required
+    selected_thickness = None
+    for t in standard_foils:
+        if t >= required_thickness_mm:
+            selected_thickness = t
+            break
+
+    if not selected_thickness:
+        # Need multiple layers of foil in parallel? Or just thicker custom foil?
+        # Assume custom is possible up to 1mm
+        if required_thickness_mm <= 1.0:
+            selected_thickness = required_thickness_mm
+        else:
+             return {"feasible": False, "reason": f"Required foil thickness {required_thickness_mm:.2f}mm too large"}
+
+    return {
+        "feasible": True,
+        "width_mm": max_foil_width_mm,
+        "thickness_mm": selected_thickness,
+        "area_mm2": max_foil_width_mm * selected_thickness,
+        "current_density_actual": current_rms / ((max_foil_width_mm * selected_thickness) / 100),
+        "ac_resistance_factor": ac_resistance_factor,
+        "skin_depth_mm": skin_depth_mm
+    }
