@@ -6,6 +6,7 @@ Based on McLyman's Ap/Kg and Erickson's Kgfe methodologies
 from enum import Enum
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
+from models.waveform import WaveformType
 
 
 class TransformerType(str, Enum):
@@ -17,12 +18,8 @@ class TransformerType(str, Enum):
     PULSE = "pulse"            # Energy transfer / pulse
 
 
-class WaveformType(str, Enum):
-    """Input waveform type"""
-    SINUSOIDAL = "sinusoidal"  # Kf = 4.44
-    SQUARE = "square"          # Kf = 4.0
-    TRIANGULAR = "triangular"  # Kf = 4.0
-    PULSE = "pulse"            # Use volt-seconds method
+# Re-export WaveformType from waveform module
+# This ensures a single source of truth
 
 
 class DesignMethod(str, Enum):

@@ -36,7 +36,24 @@ from calculations.pulse_transformer import (
     calculate_leakage_inductance,
     calculate_winding_capacitance,
 )
-from calculations.winding import awg_to_mm, calculate_dc_resistance
+from calculations.winding import (
+    awg_to_mm,
+    calculate_dc_resistance,
+    wire_selection_high_current,
+    foil_winding_design,
+    calculate_skin_depth,
+)
+from calculations.thermal import (
+    thermal_mass_estimate,
+    thermal_pulsed_operation,
+    calculate_surface_area,
+)
+from calculations.waveform import (
+    PulseWaveform,
+    calculate_volt_seconds,
+    calculate_effective_frequency,
+)
+from models.waveform import WaveformType
 from integrations.openmagnetics import get_openmagnetics_db
 
 import math
@@ -236,6 +253,18 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         pollution_degree=requirements.pollution_degree.value,
     )
     
+    # Effective frequency (for skin depth)
+    f_eff = calculate_effective_frequency(
+        PulseWaveform(
+            waveform_type=WaveformType.SQUARE,  # Approximate
+            peak_voltage=requirements.primary_voltage_V,
+            pulse_width=pulse_width_us * 1e-6,
+            rise_time=requirements.rise_time_ns * 1e-9 if requirements.rise_time_ns else 0,
+            fall_time=requirements.fall_time_ns * 1e-9 if requirements.fall_time_ns else 0,
+            repetition_rate=requirements.frequency_Hz,
+        )
+    )
+
     # Search for suitable core
     db = get_openmagnetics_db()
     
@@ -305,42 +334,102 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     else:
         Ip_peak = 1.0  # Default 1A
     
+    # Filter cores by constraints if specified
+    if requirements.max_height_mm or requirements.max_footprint_mm2:
+        filtered_cores = []
+        for core in cores:
+            # Check dimensions (OpenMagnetics returns width_mm, height_mm, depth_mm)
+            # If local DB, it might not have these fields, so skip check if missing
+
+            # Height check
+            if requirements.max_height_mm and 'height_mm' in core:
+                if core['height_mm'] > requirements.max_height_mm:
+                    continue
+
+            # Footprint check (Width x Depth)
+            if requirements.max_footprint_mm2 and 'width_mm' in core and 'depth_mm' in core:
+                footprint = core['width_mm'] * core['depth_mm']
+                if footprint > requirements.max_footprint_mm2:
+                    continue
+
+            filtered_cores.append(core)
+
+        if filtered_cores:
+            cores = filtered_cores
+            # Re-select best core from filtered list
+            selected_core = None
+            for core in cores:
+                if core.get('Ae_cm2', 0) >= required_Ae_cm2 * 0.9:
+                    selected_core = core
+                    break
+            if not selected_core:
+                selected_core = cores[0]
+
     # Wire sizing: use higher current density for pulse (5-10 A/mm² for short pulses)
-    current_density = 5.0  # A/mm² - conservative
+    current_density_A_cm2 = 500.0  # 5 A/mm² = 500 A/cm²
     if is_hv_power_pulse and pulse_width_us < 10000:  # < 10ms pulse
-        current_density = 10.0  # Higher density OK for short pulses
+        current_density_A_cm2 = 1000.0  # 10 A/mm²
+
+    # RMS current approximation (Square wave D * Ipk^2)
+    # I_rms = I_pk * sqrt(D)
+    duty = requirements.duty_cycle_percent / 100
+    Ip_rms = Ip_peak * math.sqrt(duty)
     
-    wire_area_mm2 = Ip_peak / current_density
-    wire_dia_mm = math.sqrt(4 * wire_area_mm2 / math.pi)
+    # Use advanced wire selection
+    primary_wire_sel = wire_selection_high_current(
+        current_peak_A=Ip_peak,
+        current_rms_A=Ip_rms,
+        frequency_Hz=f_eff,
+        current_density_A_cm2=current_density_A_cm2,
+    )
     
-    # For kA currents, use foil or cable instead of AWG
-    if Ip_peak > 100:
-        # Use foil or cable description instead of AWG
+    recommended = primary_wire_sel["recommended"]
+    if recommended["type"] == "foil":
+        primary_wire_type = "foil"
         primary_awg = None
-        primary_wire_dia = wire_dia_mm
-        primary_wire_type = "foil" if wire_area_mm2 > 50 else "cable"
+        primary_wire_dia = 0 # Not applicable for foil
+        # Foil dimensions
+        foil_t = recommended.get("thickness_mm", 0.1)
+        foil_w = recommended.get("width_mm", 10.0)
+        wire_area_mm2 = foil_t * foil_w
+    elif recommended["type"] == "litz":
+        primary_wire_type = "litz"
+        primary_awg = None # Bundle AWG not standard
+        primary_wire_dia = recommended.get("outer_diameter_mm", 1.0)
+        wire_area_mm2 = recommended.get("total_area_mm2", 1.0)
     else:
-        # Find nearest AWG (extend range for larger wires)
-        # awg_to_mm returns (diameter_mm, area_mm2) tuple
-        awg_table = [(awg, awg_to_mm(awg)[0]) for awg in range(10, 40)]  # AWG 10-40 range
-        primary_awg = min(awg_table, key=lambda x: abs(x[1] - wire_dia_mm))[0]
-        primary_wire_dia = awg_to_mm(primary_awg)[0]  # Get diameter from tuple
         primary_wire_type = "solid"
+        primary_awg = recommended.get("awg", 20)
+        primary_wire_dia = awg_to_mm(primary_awg)[0]
+        wire_area_mm2 = awg_to_mm(primary_awg)[1] * recommended.get("parallels", 1)
+
+    # Secondary wire selection
+    secondary_current_peak = Ip_peak / turns_ratio if turns_ratio > 1 else Ip_peak * turns_ratio
+    secondary_current_rms = secondary_current_peak * math.sqrt(duty)
     
-    # Secondary wire (scaled by turns ratio for current)
-    secondary_current = Ip_peak / turns_ratio if turns_ratio > 1 else Ip_peak * turns_ratio
-    secondary_wire_area = secondary_current / current_density
-    secondary_wire_dia = math.sqrt(4 * secondary_wire_area / math.pi)
+    secondary_wire_sel = wire_selection_high_current(
+        current_peak_A=secondary_current_peak,
+        current_rms_A=secondary_current_rms,
+        frequency_Hz=f_eff,
+        current_density_A_cm2=current_density_A_cm2,
+    )
     
-    if secondary_current > 100:
+    sec_rec = secondary_wire_sel["recommended"]
+    if sec_rec["type"] == "foil":
+        secondary_wire_type = "foil"
         secondary_awg = None
-        secondary_wire_dia_actual = secondary_wire_dia
-        secondary_wire_type = "foil" if secondary_wire_area > 50 else "cable"
+        secondary_wire_dia_actual = 0
+        secondary_wire_area = sec_rec.get("thickness_mm", 0.1) * sec_rec.get("width_mm", 10.0)
+    elif sec_rec["type"] == "litz":
+        secondary_wire_type = "litz"
+        secondary_awg = None
+        secondary_wire_dia_actual = sec_rec.get("outer_diameter_mm", 1.0)
+        secondary_wire_area = sec_rec.get("total_area_mm2", 1.0)
     else:
-        awg_table = [(awg, awg_to_mm(awg)[0]) for awg in range(10, 40)]  # Get diameter from tuple
-        secondary_awg = min(awg_table, key=lambda x: abs(x[1] - secondary_wire_dia))[0]
-        secondary_wire_dia_actual = awg_to_mm(secondary_awg)[0]  # Get diameter from tuple
         secondary_wire_type = "solid"
+        secondary_awg = sec_rec.get("awg", 24)
+        secondary_wire_dia_actual = awg_to_mm(secondary_awg)[0]
+        secondary_wire_area = awg_to_mm(secondary_awg)[1] * sec_rec.get("parallels", 1)
     
     # Calculate inductances
     lm_cm = selected_core.get('lm_cm', 3.0)
@@ -424,19 +513,62 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     
     # Estimate losses (simplified)
     # Core loss at operating frequency and Bmax (low duty cycle reduces average)
-    duty = requirements.duty_cycle_percent / 100
     Pcore_mW = 10 * Ae_cm2 * duty  # Very rough estimate
-    
+    if selected_core.get('source') == 'openmagnetics':
+        # Could use actual Steinmetz from DB if available, for now simple scaling
+        pass
+
     # Copper loss (DC approximation)
     Pcu_mW = (Ip_peak ** 2) * (primary_Rdc + secondary_Rdc / (turns_ratio ** 2)) * duty
     
     total_loss_mW = Pcore_mW + Pcu_mW
     
-    # Temperature rise estimate
+    # Thermal Analysis (Advanced)
     At_cm2 = selected_core.get('At_cm2', 10)
-    psi = total_loss_mW / 1000 / At_cm2  # W/cm²
-    temp_rise = 450 * (psi ** 0.826) if psi > 0 else 0
+    core_weight_g = selected_core.get('weight_g', Ae_cm2 * 5) # Rough estimate if missing
+    copper_weight_g = (primary_Rdc/1000 * (Ip_rms/current_density_A_cm2*100) * 8.96) # Very rough
+
+    # Thermal mass estimate
+    c_th = thermal_mass_estimate(
+        core_weight_kg=core_weight_g / 1000,
+        copper_weight_kg=copper_weight_g / 1000
+    )
+
+    # Thermal resistance estimate
+    # Rth = 1 / (h * At)
+    # h ~ 0.001 W/cm2C for natural convection
+    Rth = 1 / (0.001 * At_cm2)
     
+    thermal_analysis = thermal_pulsed_operation(
+        peak_power=total_loss_mW / 1000 / duty if duty > 0 else 0, # Instantaneous power during pulse
+        average_power=total_loss_mW / 1000,
+        pulse_width=pulse_width_us * 1e-6,
+        duty_cycle=duty,
+        thermal_mass=c_th,
+        thermal_resistance=Rth
+    )
+
+    temp_rise = thermal_analysis["temp_peak_rise_C"]
+
+    # HV Winding Check
+    hv_notes = []
+    if requirements.secondary_voltage_V > 1000:
+        # Check winding build for HV
+        # Estimate bobbin dimensions from Wa
+        window_height_mm = math.sqrt(Wa_cm2) * 10
+        window_width_mm = math.sqrt(Wa_cm2) * 10 * 0.8 # Rough aspect
+
+        hv_build = winding_build_hv(
+            turns=secondary_turns,
+            wire_diameter_mm=secondary_wire_dia_actual,
+            bobbin_winding_length_mm=window_height_mm,
+            bobbin_winding_depth_mm=window_width_mm / 2, # Share window
+            required_creepage_mm=insulation.creepage_mm
+        )
+        if not hv_build.is_feasible:
+            warnings.append(f"HV Winding Feasibility: {hv_build.notes[0]}")
+        hv_notes = hv_build.notes
+
     # Build response
     return {
         "application": requirements.application.value,

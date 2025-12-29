@@ -1,0 +1,38 @@
+{
+  "wire_insulation": {
+    "polyester_enamel": {
+      "temperature_class": "155",
+      "dielectric_strength_V_mm": 80000,
+      "typical_thickness_mm": 0.03
+    },
+    "polyimide": {
+      "temperature_class": "220",
+      "dielectric_strength_V_mm": 150000,
+      "typical_thickness_mm": 0.025,
+      "notes": "Kapton-based, excellent for HV"
+    }
+  },
+  "layer_insulation": {
+    "nomex_410": {
+      "temperature_class": "220",
+      "dielectric_strength_V_mm": 25000,
+      "thickness_mm": [0.05, 0.08, 0.13, 0.18, 0.25]
+    },
+    "kapton": {
+      "temperature_class": "260",
+      "dielectric_strength_V_mm": 200000,
+      "thickness_mm": [0.025, 0.05, 0.075, 0.125]
+    }
+  },
+  "impregnation": {
+    "polyester_varnish": {
+      "temperature_class": "155",
+      "dielectric_strength_kV_mm": 20
+    },
+    "epoxy_resin": {
+      "temperature_class": "180",
+      "dielectric_strength_kV_mm": 30,
+      "notes": "Good for HV potting"
+    }
+  }
+}
