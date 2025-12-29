@@ -28,6 +28,22 @@
                     <div v-if="requirements.application === 'hv_power_pulse'" class="info-box mt-3">
                         💡 HV Power Pulse mode uses silicon-steel cores (Bmax ~1.2T) for energy transfer applications like plasma power supplies.
                     </div>
+
+                    <!-- Gate Drive Presets -->
+                    <div v-if="requirements.application === 'gate_drive' && Object.keys(presets).length > 0" class="presets-section mt-3">
+                        <h5>Quick Presets</h5>
+                        <div class="preset-chips">
+                            <button
+                                type="button"
+                                v-for="(preset, key) in presets"
+                                :key="key"
+                                class="preset-chip"
+                                @click="applyPreset(key)"
+                                :title="preset.description">
+                                {{ preset.name }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <form @submit.prevent="designPulseTransformer">
@@ -52,6 +68,38 @@
                     <!-- Pulse Parameters -->
                     <div class="form-section">
                         <h4>Pulse Parameters</h4>
+
+                        <!-- Simple Waveform Preview -->
+                        <div class="waveform-preview mb-3">
+                            <svg viewBox="0 0 300 80" class="waveform-svg">
+                                <!-- Grid -->
+                                <line x1="0" y1="70" x2="300" y2="70" stroke="#444" stroke-width="1" />
+                                <line x1="10" y1="0" x2="10" y2="80" stroke="#444" stroke-width="1" />
+
+                                <!-- Pulse Shape -->
+                                <!--
+                                    Visualizing the pulse shape relative to the period.
+                                    Scale: 280px = 1 period (1/f)
+                                    Height: 60px = Vpk
+                                -->
+                                <path
+                                    :d="`
+                                        M 10 70
+                                        L ${10 + (requirements.rise_time_ns || 0)/100} 10
+                                        L ${10 + (requirements.pulse_width_us/ (1/requirements.frequency_Hz*1e6) * 280)} 10
+                                        L ${10 + (requirements.pulse_width_us/ (1/requirements.frequency_Hz*1e6) * 280) + (requirements.fall_time_ns || 0)/100} 70
+                                        L 290 70
+                                    `"
+                                    fill="none"
+                                    stroke="var(--color-accent-primary)"
+                                    stroke-width="2"
+                                    vector-effect="non-scaling-stroke"
+                                />
+                                <text x="15" y="25" fill="#888" font-size="10">Vpk</text>
+                                <text x="250" y="65" fill="#888" font-size="10">Time</text>
+                            </svg>
+                        </div>
+
                         <div class="grid grid-2 gap-3">
                             <div class="form-group">
                                 <label>Pulse Width [µs]</label>
@@ -61,6 +109,14 @@
                             <div class="form-group">
                                 <label>Frequency [Hz]</label>
                                 <input type="number" v-model.number="requirements.frequency_Hz" min="1" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Rise Time [ns]</label>
+                                <input type="number" v-model.number="requirements.rise_time_ns" min="0" step="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Fall Time [ns]</label>
+                                <input type="number" v-model.number="requirements.fall_time_ns" min="0" step="10">
                             </div>
                             <div class="form-group">
                                 <label>Peak Current [A]</label>
@@ -111,13 +167,33 @@
 
                     <!-- Core Material Type -->
                     <div class="form-section">
-                        <h4>Core Material</h4>
-                        <select v-model="requirements.core_material_type" class="full-width">
-                            <option value="ferrite">Ferrite (HF, Bmax ~0.2T)</option>
-                            <option value="silicon_steel">Silicon Steel (LF, Bmax ~1.2T)</option>
-                            <option value="amorphous">Amorphous (Bmax ~1.0T)</option>
-                            <option value="nanocrystalline">Nanocrystalline (Bmax ~0.8T)</option>
-                        </select>
+                        <h4>Core & Constraints</h4>
+                        <div class="grid grid-2 gap-3 mb-3">
+                            <div class="form-group">
+                                <label>Core Material</label>
+                                <select v-model="requirements.core_material_type">
+                                    <option value="ferrite">Ferrite (HF, Bmax ~0.2T)</option>
+                                    <option value="silicon_steel">Silicon Steel (LF, Bmax ~1.2T)</option>
+                                    <option value="amorphous">Amorphous (Bmax ~1.0T)</option>
+                                    <option value="nanocrystalline">Nanocrystalline (Bmax ~0.8T)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Pref. Geometry</label>
+                                <input type="text" v-model="requirements.preferred_core_geometry" placeholder="e.g. EE, ETD, PQ">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-2 gap-3">
+                            <div class="form-group">
+                                <label>Max Height [mm]</label>
+                                <input type="number" v-model.number="requirements.max_height_mm" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Max Footprint [mm²]</label>
+                                <input type="number" v-model.number="requirements.max_footprint_mm2" min="1">
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Submit -->
@@ -293,15 +369,23 @@
 
 <script setup lang="ts">
 import { usePulseDesign } from '~/composables/usePulseDesign'
+import { onMounted } from 'vue'
 
 const { 
     requirements, 
     loading, 
     error, 
     result, 
+    presets,
     designPulseTransformer, 
+    loadPresets,
+    applyPreset,
     setHvPowerPulseMode 
 } = usePulseDesign()
+
+onMounted(() => {
+    loadPresets()
+})
 </script>
 
 <style scoped>
@@ -549,5 +633,55 @@ const {
 
 .mt-3 {
     margin-top: 0.75rem;
+}
+
+.mb-3 {
+    margin-bottom: 0.75rem;
+}
+
+.presets-section {
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--color-border);
+}
+
+.presets-section h5 {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.preset-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.preset-chip {
+    padding: 0.25rem 0.75rem;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.preset-chip:hover {
+    background: var(--color-accent-primary);
+    color: white;
+    border-color: var(--color-accent-primary);
+}
+
+.waveform-preview {
+    background: #1a1a1a;
+    border-radius: var(--radius-sm);
+    padding: 0.5rem;
+    border: 1px solid var(--color-border);
+}
+
+.waveform-svg {
+    width: 100%;
+    height: 80px;
+    display: block;
 }
 </style>

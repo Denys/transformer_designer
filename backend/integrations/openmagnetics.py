@@ -76,6 +76,11 @@ class OpenMagneticsDB:
     def __init__(self):
         """Initialize the OpenMagnetics database connection."""
         # Test database availability by trying to get cores
+        if PyMKF is None:
+            self._available = False
+            logger.info("OpenMagnetics database unavailable: PyMKF not installed")
+            return
+
         try:
             # PyMKF loads databases automatically, just test it works
             cores = PyMKF.get_available_cores()
@@ -266,6 +271,9 @@ class OpenMagneticsDB:
                     'MLT_cm': round(MLT_cm, 2),
                     'At_cm2': round(At_cm2, 2),
                     'weight_g': round(weight_g, 1),
+                    'width_mm': round(width_cm * 10, 1),
+                    'height_mm': round(height_cm * 10, 1),
+                    'depth_mm': round(depth_cm * 10, 1),
                     'Bsat_T': Bsat,
                     'mu_i': mu_i,
                     'datasheet_url': mfr_info.get('datasheetUrl', '') if mfr_info else '',

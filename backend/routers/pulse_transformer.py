@@ -334,11 +334,42 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     else:
         Ip_peak = 1.0  # Default 1A
     
+    # Filter cores by constraints if specified
+    if requirements.max_height_mm or requirements.max_footprint_mm2:
+        filtered_cores = []
+        for core in cores:
+            # Check dimensions (OpenMagnetics returns width_mm, height_mm, depth_mm)
+            # If local DB, it might not have these fields, so skip check if missing
+
+            # Height check
+            if requirements.max_height_mm and 'height_mm' in core:
+                if core['height_mm'] > requirements.max_height_mm:
+                    continue
+
+            # Footprint check (Width x Depth)
+            if requirements.max_footprint_mm2 and 'width_mm' in core and 'depth_mm' in core:
+                footprint = core['width_mm'] * core['depth_mm']
+                if footprint > requirements.max_footprint_mm2:
+                    continue
+
+            filtered_cores.append(core)
+
+        if filtered_cores:
+            cores = filtered_cores
+            # Re-select best core from filtered list
+            selected_core = None
+            for core in cores:
+                if core.get('Ae_cm2', 0) >= required_Ae_cm2 * 0.9:
+                    selected_core = core
+                    break
+            if not selected_core:
+                selected_core = cores[0]
+
     # Wire sizing: use higher current density for pulse (5-10 A/mm² for short pulses)
-    current_density_Am2 = 500.0  # 5 A/mm² = 500 A/cm²
+    current_density_A_cm2 = 500.0  # 5 A/mm² = 500 A/cm²
     if is_hv_power_pulse and pulse_width_us < 10000:  # < 10ms pulse
-        current_density_Am2 = 1000.0  # 10 A/mm²
-    
+        current_density_A_cm2 = 1000.0  # 10 A/mm²
+
     # RMS current approximation (Square wave D * Ipk^2)
     # I_rms = I_pk * sqrt(D)
     duty = requirements.duty_cycle_percent / 100
@@ -349,7 +380,7 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         current_peak_A=Ip_peak,
         current_rms_A=Ip_rms,
         frequency_Hz=f_eff,
-        current_density_A_cm2=current_density_Am2,
+        current_density_A_cm2=current_density_A_cm2,
     )
     
     recommended = primary_wire_sel["recommended"]
@@ -380,7 +411,7 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         current_peak_A=secondary_current_peak,
         current_rms_A=secondary_current_rms,
         frequency_Hz=f_eff,
-        current_density_A_cm2=current_density_Am2,
+        current_density_A_cm2=current_density_A_cm2,
     )
     
     sec_rec = secondary_wire_sel["recommended"]
@@ -495,7 +526,7 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
     # Thermal Analysis (Advanced)
     At_cm2 = selected_core.get('At_cm2', 10)
     core_weight_g = selected_core.get('weight_g', Ae_cm2 * 5) # Rough estimate if missing
-    copper_weight_g = (primary_Rdc/1000 * (Ip_rms/current_density_Am2*100) * 8.96) # Very rough
+    copper_weight_g = (primary_Rdc/1000 * (Ip_rms/current_density_A_cm2*100) * 8.96) # Very rough
 
     # Thermal mass estimate
     c_th = thermal_mass_estimate(
