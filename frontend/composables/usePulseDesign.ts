@@ -33,6 +33,7 @@ export interface PulseTransformerRequirements {
     pulse_width_us: number
     pulse_width_ms?: number  // For millisecond-range pulses
     rise_time_ns?: number
+    fall_time_ns?: number
     duty_cycle_percent: number
     frequency_Hz: number
 
@@ -64,6 +65,8 @@ export interface PulseTransformerRequirements {
     preferred_core_geometry?: string
     preferred_material?: string
     core_material_type?: CoreMaterialType
+    max_height_mm?: number
+    max_footprint_mm2?: number
 
     // Direct turns specification (for HV power pulse)
     primary_turns?: number
@@ -265,6 +268,12 @@ export function usePulseDesign() {
         requirements.value.insulation_type = 'reinforced'
         requirements.value.primary_turns = 2
         requirements.value.secondary_turns = 50
+
+        // Clear conflicting fields
+        requirements.value.rise_time_ns = undefined
+        requirements.value.fall_time_ns = undefined
+        requirements.value.max_height_mm = undefined
+        requirements.value.max_footprint_mm2 = undefined
     }
 
     function reset(): void {
