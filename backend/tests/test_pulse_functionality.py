@@ -1,6 +1,7 @@
 import pytest
 import math
-from calculations.waveform import WaveformType, PulseWaveform, calculate_volt_seconds, calculate_rms_voltage, calculate_effective_frequency
+from calculations.waveform import calculate_volt_seconds, calculate_rms_voltage, calculate_effective_frequency
+from models.waveform import WaveformType, PulseWaveform
 from calculations.insulation import winding_build_hv, recommend_insulation_system
 from calculations.winding import wire_selection_high_current, foil_winding_design, effective_frequency_pulse
 from calculations.thermal import thermal_pulsed_operation
