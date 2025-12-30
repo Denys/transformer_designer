@@ -47,78 +47,34 @@
                 </div>
 
                 <form @submit.prevent="designPulseTransformer">
-                    <!-- Voltage -->
+
+                    <!-- Pulse Waveform Inputs (New Component) -->
                     <div class="form-section">
-                        <h4>Voltages</h4>
+                        <h4>Waveform & Pulse Parameters</h4>
+                        <PulseWaveformInput v-model="requirements" />
+                    </div>
+
+                    <!-- Secondary Voltage / Turns Ratio -->
+                     <div class="form-section">
+                        <h4>Secondary Output</h4>
                         <div class="grid grid-2 gap-3">
-                            <div class="form-group">
-                                <label>Primary Voltage [V]</label>
-                                <input type="number" v-model.number="requirements.primary_voltage_V" min="1" required>
-                            </div>
-                            <div class="form-group">
+                             <div class="form-group">
                                 <label>Secondary Voltage [V]</label>
                                 <input type="number" v-model.number="requirements.secondary_voltage_V" min="1" required>
                             </div>
+                            <div class="form-group">
+                                <label>Turns Ratio (Approx)</label>
+                                <div class="ratio-value">
+                                    {{ (requirements.secondary_voltage_V / (requirements.primary_voltage_V || 1)).toFixed(1) }}:1
+                                </div>
+                            </div>
                         </div>
-                        <div class="ratio-display">
-                            Turns ratio: {{ (requirements.secondary_voltage_V / requirements.primary_voltage_V).toFixed(1) }}:1
-                        </div>
-                    </div>
+                     </div>
 
-                    <!-- Pulse Parameters -->
-                    <div class="form-section">
-                        <h4>Pulse Parameters</h4>
-
-                        <!-- Simple Waveform Preview -->
-                        <div class="waveform-preview mb-3">
-                            <svg viewBox="0 0 300 80" class="waveform-svg">
-                                <!-- Grid -->
-                                <line x1="0" y1="70" x2="300" y2="70" stroke="#444" stroke-width="1" />
-                                <line x1="10" y1="0" x2="10" y2="80" stroke="#444" stroke-width="1" />
-
-                                <!-- Pulse Shape -->
-                                <!--
-                                    Visualizing the pulse shape relative to the period.
-                                    Scale: 280px = 1 period (1/f)
-                                    Height: 60px = Vpk
-                                -->
-                                <path
-                                    :d="`
-                                        M 10 70
-                                        L ${10 + (requirements.rise_time_ns || 0)/100} 10
-                                        L ${10 + (requirements.pulse_width_us/ (1/requirements.frequency_Hz*1e6) * 280)} 10
-                                        L ${10 + (requirements.pulse_width_us/ (1/requirements.frequency_Hz*1e6) * 280) + (requirements.fall_time_ns || 0)/100} 70
-                                        L 290 70
-                                    `"
-                                    fill="none"
-                                    stroke="var(--color-accent-primary)"
-                                    stroke-width="2"
-                                    vector-effect="non-scaling-stroke"
-                                />
-                                <text x="15" y="25" fill="#888" font-size="10">Vpk</text>
-                                <text x="250" y="65" fill="#888" font-size="10">Time</text>
-                            </svg>
-                        </div>
-
+                     <div class="form-section">
+                        <h4>Load & Duty</h4>
                         <div class="grid grid-2 gap-3">
-                            <div class="form-group">
-                                <label>Pulse Width [µs]</label>
-                                <input type="number" v-model.number="requirements.pulse_width_us" min="0.1" step="0.1" required>
-                                <small v-if="requirements.pulse_width_us > 1000">= {{ (requirements.pulse_width_us / 1000).toFixed(2) }} ms</small>
-                            </div>
-                            <div class="form-group">
-                                <label>Frequency [Hz]</label>
-                                <input type="number" v-model.number="requirements.frequency_Hz" min="1" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Rise Time [ns]</label>
-                                <input type="number" v-model.number="requirements.rise_time_ns" min="0" step="10">
-                            </div>
-                            <div class="form-group">
-                                <label>Fall Time [ns]</label>
-                                <input type="number" v-model.number="requirements.fall_time_ns" min="0" step="10">
-                            </div>
-                            <div class="form-group">
+                             <div class="form-group">
                                 <label>Peak Current [A]</label>
                                 <input type="number" v-model.number="requirements.peak_current_A" min="0.001" step="0.1">
                             </div>
@@ -127,11 +83,12 @@
                                 <input type="number" v-model.number="requirements.duty_cycle_percent" min="0.1" max="99" step="0.1">
                             </div>
                         </div>
-                    </div>
+                     </div>
+
 
                     <!-- Turns (for HV Power Pulse) -->
                     <div class="form-section" v-if="requirements.application === 'hv_power_pulse'">
-                        <h4>Winding Turns</h4>
+                        <h4>Winding Turns (Manual Override)</h4>
                         <div class="grid grid-2 gap-3">
                             <div class="form-group">
                                 <label>Primary Turns</label>
@@ -144,25 +101,10 @@
                         </div>
                     </div>
 
-                    <!-- Insulation -->
+                    <!-- Insulation (New Component) -->
                     <div class="form-section">
                         <h4>Insulation (IEC 60664)</h4>
-                        <div class="grid grid-2 gap-3">
-                            <div class="form-group">
-                                <label>Isolation Voltage [Vrms]</label>
-                                <input type="number" v-model.number="requirements.isolation_voltage_Vrms" min="100" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Insulation Type</label>
-                                <select v-model="requirements.insulation_type">
-                                    <option value="functional">Functional</option>
-                                    <option value="basic">Basic</option>
-                                    <option value="supplementary">Supplementary</option>
-                                    <option value="double">Double</option>
-                                    <option value="reinforced">Reinforced</option>
-                                </select>
-                            </div>
-                        </div>
+                        <HighVoltageInsulation v-model="requirements" />
                     </div>
 
                     <!-- Core Material Type -->
