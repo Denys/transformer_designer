@@ -49,11 +49,10 @@ from calculations.thermal import (
     calculate_surface_area,
 )
 from calculations.waveform import (
-    PulseWaveform,
-    WaveformType,
     calculate_volt_seconds,
     calculate_effective_frequency,
 )
+from models.waveform import PulseWaveform, WaveformType
 from integrations.openmagnetics import get_openmagnetics_db
 
 import math

@@ -9,33 +9,10 @@ Handles:
 
 import math
 from enum import Enum
-from dataclasses import dataclass
 from typing import Optional, Union, Tuple
 import numpy as np
 
-
-class WaveformType(str, Enum):
-    SINUSOIDAL = "sinusoidal"
-    SQUARE = "square"
-    TRIANGULAR = "triangular"
-    CAPACITOR_DISCHARGE = "capacitor_discharge"
-    CUSTOM = "custom"
-
-
-@dataclass
-class PulseWaveform:
-    """Define pulse characteristics for transformer design"""
-    waveform_type: WaveformType
-    peak_voltage: float          # V
-    pulse_width: float           # seconds
-    rise_time: float             # seconds (10-90%)
-    fall_time: float             # seconds
-    repetition_rate: float       # Hz
-
-    # For capacitor discharge
-    source_capacitance: Optional[float] = None  # F
-    circuit_resistance: Optional[float] = None   # Ω
-    circuit_inductance: Optional[float] = None   # H
+from models.waveform import WaveformType, PulseWaveform
 
 
 def calculate_volt_seconds(waveform: PulseWaveform) -> float:
