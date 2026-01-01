@@ -334,6 +334,17 @@ class PulseTransformerWinding(BaseModel):
     capacitance_pF: float = Field(..., description="Winding capacitance [pF]")
 
 
+class PulseTransformerCore(BaseModel):
+    """Pulse transformer core selection."""
+    part_number: str
+    manufacturer: str
+    geometry: str
+    material: str
+    Ae_cm2: float
+    Ap_cm4: float
+    source: str = "local"
+
+
 class PulseTransformerDesignResult(BaseModel):
     """Complete pulse transformer design result."""
     
@@ -343,13 +354,7 @@ class PulseTransformerDesignResult(BaseModel):
     turns_ratio: float
     
     # Core selection
-    core_part_number: str
-    core_manufacturer: str
-    core_geometry: str
-    core_material: str
-    core_Ae_cm2: float
-    core_Ap_cm4: float
-    core_source: str = "local"
+    core: PulseTransformerCore
     
     # Winding design
     primary: PulseTransformerWinding
