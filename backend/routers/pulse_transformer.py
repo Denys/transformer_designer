@@ -235,12 +235,12 @@ async def verify_design_endpoint(design: PulseTransformerDesignResult):
     # B = Vt / (N * Ae)
     # Saturation Bsat depends on material
     Bsat = 0.3 # Default ferrite
-    if "silicon" in design.core_material.lower():
+    if "silicon" in design.core.material.lower():
         Bsat = 1.5
-    elif "amorphous" in design.core_material.lower():
+    elif "amorphous" in design.core.material.lower():
         Bsat = 1.2
 
-    Ae_m2 = design.core_Ae_cm2 * 1e-4
+    Ae_m2 = design.core.Ae_cm2 * 1e-4
     B_op = (design.volt_second_uVs * 1e-6) / (design.primary.turns * Ae_m2)
 
     margin_B = (Bsat - B_op) / Bsat * 100
@@ -253,8 +253,8 @@ async def verify_design_endpoint(design: PulseTransformerDesignResult):
     # 2. Window Fill Factor
     # Need Aw (window area) to calculate. Use rough estimate from core geometry if available.
     # Wa_cm2 approx Ap / Ae
-    if design.core_Ap_cm4 > 0 and design.core_Ae_cm2 > 0:
-        Wa_cm2 = design.core_Ap_cm4 / design.core_Ae_cm2
+    if design.core.Ap_cm4 > 0 and design.core.Ae_cm2 > 0:
+        Wa_cm2 = design.core.Ap_cm4 / design.core.Ae_cm2
         Wa_mm2 = Wa_cm2 * 100
 
         # Calculate winding area
