@@ -1,0 +1,40 @@
+{
+  "nanocrystalline_cores": [
+    {
+      "manufacturer": "Vacuumschmelze",
+      "part_number": "T60006-L2063-W517",
+      "geometry": "toroid",
+      "material": "Vitroperm 500F",
+      "Ae_cm2": 1.25,
+      "Wa_cm2": 12.5,
+      "Ap_cm4": 15.6,
+      "le_cm": 16.0,
+      "Ve_cm3": 20.0,
+      "AL_nH": 45000,
+      "permeability": 30000,
+      "OD_mm": 63,
+      "ID_mm": 40,
+      "height_mm": 25,
+      "datasheet_url": "https://vacuumschmelze.com/W517",
+      "notes": "Excellent for common mode chokes and precision transformers"
+    },
+    {
+      "manufacturer": "Hitachi Metals",
+      "part_number": "FT-3KM F10080G",
+      "geometry": "toroid",
+      "material": "Finemet",
+      "Ae_cm2": 3.5,
+      "Wa_cm2": 45.0,
+      "Ap_cm4": 157.5,
+      "le_cm": 28.0,
+      "Ve_cm3": 98.0,
+      "AL_nH": 25000,
+      "permeability": 15000,
+      "OD_mm": 100,
+      "ID_mm": 80,
+      "height_mm": 20,
+      "datasheet_url": "https://hitachimetals.com/Finemet",
+      "notes": "High saturation flux density nanocrystalline"
+    }
+  ]
+}

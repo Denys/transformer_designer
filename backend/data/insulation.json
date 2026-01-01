@@ -10,6 +10,11 @@
       "dielectric_strength_V_mm": 150000,
       "typical_thickness_mm": 0.025,
       "notes": "Kapton-based, excellent for HV"
+    },
+    "polyester_imide": {
+      "temperature_class": "180",
+      "dielectric_strength_V_mm": 100000,
+      "typical_thickness_mm": 0.03
     }
   },
   "layer_insulation": {
@@ -22,6 +27,16 @@
       "temperature_class": "260",
       "dielectric_strength_V_mm": 200000,
       "thickness_mm": [0.025, 0.05, 0.075, 0.125]
+    },
+    "mylar": {
+      "temperature_class": "130",
+      "dielectric_strength_V_mm": 150000,
+      "thickness_mm": [0.025, 0.05, 0.075, 0.125, 0.18, 0.25]
+    },
+    "glass_cloth": {
+      "temperature_class": "180",
+      "dielectric_strength_V_mm": 15000,
+      "thickness_mm": [0.13, 0.18]
     }
   },
   "impregnation": {
@@ -33,6 +48,23 @@
       "temperature_class": "180",
       "dielectric_strength_kV_mm": 30,
       "notes": "Good for HV potting"
+    },
+    "silicone_varnish": {
+      "temperature_class": "200",
+      "dielectric_strength_kV_mm": 25,
+      "notes": "High temperature"
+    }
+  },
+  "margins": {
+    "polyester_tape": {
+      "temperature_class": "130",
+      "thickness_mm": 0.06,
+      "width_mm": [3, 4, 5, 6, 8, 10]
+    },
+    "polyimide_tape": {
+      "temperature_class": "180",
+      "thickness_mm": 0.06,
+      "width_mm": [3, 4, 5, 6, 8, 10]
     }
   }
 }

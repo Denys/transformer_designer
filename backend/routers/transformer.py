@@ -69,9 +69,48 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_cores():
-    """Load core database from JSON"""
-    with open(DATA_DIR / "cores.json") as f:
-        return json.load(f)
+    """Load core database from JSON files.
+    Aggregates all *_cores.json files in the data directory.
+    """
+    aggregated_cores = {
+        "ferrite_cores": [],
+        "silicon_steel_cores": [],
+        "powder_cores": [],
+        "nanocrystalline_cores": []
+    }
+
+    # List of known core files
+    core_files = [
+        "cores.json",
+        "silicon_steel_cores.json",
+        "magnetics_inc_cores.json",
+        "ferroxcube_cores.json",
+        "micrometals_cores.json",
+        "nanocrystalline_cores.json"
+    ]
+
+    for filename in core_files:
+        file_path = DATA_DIR / filename
+        if file_path.exists():
+            try:
+                with open(file_path) as f:
+                    data = json.load(f)
+                    # Merge data into aggregated dict
+                    for key, core_list in data.items():
+                        # Normalize key if needed or map specific file content
+                        target_key = key
+                        # Handle specific files if they don't have top-level keys matching standard
+                        # But our new files follow the standard {"type_cores": []} format.
+
+                        if target_key in aggregated_cores:
+                            aggregated_cores[target_key].extend(core_list)
+                        else:
+                            # Add new categories if encountered
+                            aggregated_cores[target_key] = core_list
+            except Exception as e:
+                logger.error(f"Error loading core file {filename}: {e}")
+
+    return aggregated_cores
 
 
 def load_materials():

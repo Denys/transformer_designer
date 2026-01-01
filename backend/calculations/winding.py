@@ -10,6 +10,8 @@ Includes:
 """
 
 import math
+import json
+from pathlib import Path
 from typing import Tuple, Optional, Literal, Dict
 
 # Copper resistivity at 20°C [Ω·cm]
@@ -72,6 +74,16 @@ AWG_TABLE = {
 
 # Standard Litz wire bundle sizes (hex packing for round strands)
 LITZ_BUNDLE_SIZES = [7, 19, 37, 65, 127, 259, 427, 741, 1050, 2100]
+
+# Load Litz wire database if available
+DATA_DIR = Path(__file__).parent.parent / "data"
+WIRES_DB = {}
+
+try:
+    with open(DATA_DIR / "wires.json") as f:
+        WIRES_DB = json.load(f)
+except Exception:
+    pass # Fallback to defaults
 
 # Recommended strand gauges for Litz wire by frequency range
 LITZ_STRAND_AWG_BY_FREQ = {

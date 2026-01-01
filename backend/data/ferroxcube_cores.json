@@ -1,0 +1,49 @@
+{
+  "ferrite_cores": [
+    {
+      "manufacturer": "Ferroxcube",
+      "part_number": "E100/60/28",
+      "geometry": "E",
+      "material": "3C90",
+      "Ae_cm2": 8.9,
+      "Wa_cm2": 9.5,
+      "Ap_cm4": 84.55,
+      "le_cm": 24.0,
+      "Ve_cm3": 214,
+      "AL_nH": 8500,
+      "weight_g": 1100,
+      "datasheet_url": "https://www.ferroxcube.com/E100"
+    },
+    {
+      "manufacturer": "Ferroxcube",
+      "part_number": "U93/76/30",
+      "geometry": "U",
+      "material": "3C90",
+      "Ae_cm2": 8.4,
+      "Wa_cm2": 19.4,
+      "Ap_cm4": 162.9,
+      "le_cm": 35.8,
+      "Ve_cm3": 300,
+      "AL_nH": 5600,
+      "weight_g": 1600,
+      "datasheet_url": "https://www.ferroxcube.com/U93"
+    },
+    {
+      "manufacturer": "Ferroxcube",
+      "part_number": "TX102/66/25",
+      "geometry": "toroid",
+      "material": "3E27",
+      "Ae_cm2": 4.45,
+      "Wa_cm2": 34.0,
+      "Ap_cm4": 151.3,
+      "le_cm": 25.8,
+      "Ve_cm3": 115,
+      "AL_nH": 12000,
+      "permeability": 6000,
+      "OD_mm": 102,
+      "ID_mm": 65.8,
+      "height_mm": 25,
+      "datasheet_url": "https://www.ferroxcube.com/TX102"
+    }
+  ]
+}
