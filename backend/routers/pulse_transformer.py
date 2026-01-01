@@ -37,6 +37,9 @@ from calculations.pulse_transformer import (
     calculate_winding_capacitance,
     calculate_energy_transfer_efficiency,
 )
+from calculations.insulation import (
+    winding_build_hv
+)
 from calculations.winding import (
     awg_to_mm,
     calculate_dc_resistance,
@@ -686,10 +689,16 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
         window_height_mm = math.sqrt(Wa_cm2) * 10
         window_width_mm = math.sqrt(Wa_cm2) * 10 * 0.8 # Rough aspect
 
-        # Placeholder for HV winding build verification
-        # Actual implementation requires 'winding_build_hv' which is not imported or implemented here
-        # For now, we assume feasibility if insulation requirements are met
-        pass
+        hv_build = winding_build_hv(
+            turns=secondary_turns,
+            wire_diameter_mm=secondary_wire_dia_actual,
+            bobbin_winding_length_mm=window_height_mm,
+            bobbin_winding_depth_mm=window_width_mm / 2, # Share window
+            required_creepage_mm=insulation.creepage_mm
+        )
+        if not hv_build.is_feasible:
+            warnings.append(f"HV Winding Feasibility: {hv_build.notes[0]}")
+        hv_notes = hv_build.notes
 
     # Build response
     return {
@@ -716,7 +725,9 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
             "peak_current_A": round(Ip_peak, 1),
             "layers": 1,
             "Rdc_mOhm": round(primary_Rdc, 3),
+            "Rac_factor": 1.0,  # Placeholder, should be calculated
             "inductance_uH": round(Lm_uH, 2),
+            "capacitance_pF": round(Cw_pF / 2, 2), # Distributed roughly half-half
         },
         
         "secondary": {
@@ -727,6 +738,9 @@ async def design_pulse_transformer(requirements: PulseTransformerRequirements):
             "wire_area_mm2": round(secondary_wire_area, 2),
             "layers": 1,
             "Rdc_mOhm": round(secondary_Rdc, 3),
+            "Rac_factor": 1.0,  # Placeholder
+            "inductance_uH": round(Lm_uH * (turns_ratio ** 2), 2),
+            "capacitance_pF": round(Cw_pF / 2, 2),
         },
         
         "electrical": {

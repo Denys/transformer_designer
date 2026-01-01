@@ -108,7 +108,40 @@
       <div v-else></div> <!-- Spacer -->
 
       <button v-if="currentStep < 4" @click="currentStep++" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Next</button>
-      <button v-else @click="runDesign" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Run Design</button>
+      <button v-else @click="runDesign" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" :disabled="loading">
+        {{ loading ? 'Calculating...' : 'Run Design' }}
+      </button>
+    </div>
+
+    <!-- Results Modal/Overlay -->
+    <div v-if="result" class="results mt-8 p-6 bg-gray-50 border rounded-lg">
+      <h3 class="text-xl font-bold mb-4">Design Results</h3>
+
+      <div v-if="result.verification" class="mb-4 p-3 rounded"
+           :class="result.verification.meets_specifications ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+        <span class="font-bold">{{ result.verification.meets_specifications ? 'PASS' : 'FAIL' }}</span>
+        <ul v-if="result.verification.warnings.length" class="mt-2 text-sm list-disc pl-5">
+          <li v-for="w in result.verification.warnings" :key="w">{{ w }}</li>
+        </ul>
+      </div>
+
+      <div class="grid grid-cols-2 gap-6">
+        <div>
+          <h4 class="font-semibold text-gray-700">Core Selection</h4>
+          <p class="text-lg">{{ result.core.part_number }}</p>
+          <p class="text-sm text-gray-500">{{ result.core.manufacturer }} ({{ result.core.material }})</p>
+          <p class="text-sm">Ae: {{ result.core.Ae_cm2 }} cm²</p>
+        </div>
+        <div>
+          <h4 class="font-semibold text-gray-700">Winding</h4>
+          <p>Primary: {{ result.primary.turns }} turns ({{ result.primary.wire_type }})</p>
+          <p>Secondary: {{ result.secondary.turns }} turns ({{ result.secondary.wire_type }})</p>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+         <button @click="result = null" class="px-4 py-2 text-gray-600 hover:text-gray-800">Close</button>
+      </div>
     </div>
   </div>
 </template>
@@ -117,6 +150,8 @@
 import { ref, reactive } from 'vue';
 
 const currentStep = ref(1);
+const loading = ref(false);
+const result = ref(null);
 const steps = [
   { id: 1, name: 'Application' },
   { id: 2, name: 'Load' },
@@ -139,8 +174,29 @@ const design = reactive({
 const emit = defineEmits(['design-complete']);
 
 const runDesign = async () => {
-  // Call API or emit event
-  emit('design-complete', { ...design });
+  loading.value = true;
+  result.value = null;
+  try {
+    const response = await fetch('/api/design/pulse/design', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(design),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || 'Design failed');
+    }
+
+    result.value = await response.json();
+    emit('design-complete', result.value);
+  } catch (error) {
+    alert('Error running design: ' + error.message);
+  } finally {
+    loading.value = false;
+  }
 };
 </script>
 
