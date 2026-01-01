@@ -279,6 +279,51 @@ export function useExport() {
     }
     
     // ========================================================================
+    // PDF Export
+    // ========================================================================
+
+    async function downloadPDF(
+        designResult: TransformerDesignResult,
+        requirements: TransformerRequirements,
+    ): Promise<boolean> {
+        loading.value = true
+        error.value = null
+
+        try {
+            const response = await fetch(`${API_BASE}/api/export/pdf/download`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    design_result: designResult,
+                    requirements: requirements,
+                    pretty: true,
+                }),
+            })
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`)
+            }
+
+            const contentDisposition = response.headers.get('Content-Disposition')
+            let filename = 'transformer_report.pdf'
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="(.+)"/)
+                if (match) filename = match[1]
+            }
+
+            const blob = await response.blob()
+            downloadBlob(blob, filename)
+
+            return true
+        } catch (e) {
+            error.value = e instanceof Error ? e.message : 'Download failed'
+            return false
+        } finally {
+            loading.value = false
+        }
+    }
+
+    // ========================================================================
     // Unified Export Function
     // ========================================================================
     
@@ -295,6 +340,7 @@ export function useExport() {
             case 'json':
                 return await downloadJSON(designResult, requirements)
             case 'pdf':
+                return await downloadPDF(designResult, requirements)
             case 'step':
                 error.value = `${format.toUpperCase()} export not yet available`
                 return false
