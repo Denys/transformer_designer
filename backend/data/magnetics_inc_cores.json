@@ -1,0 +1,89 @@
+{
+  "powder_cores": [
+    {
+      "manufacturer": "Magnetics Inc",
+      "part_number": "77083A7",
+      "geometry": "toroid",
+      "material": "Kool Mu",
+      "Ae_cm2": 0.454,
+      "Wa_cm2": 1.78,
+      "Ap_cm4": 0.808,
+      "le_cm": 9.84,
+      "Ve_cm3": 4.47,
+      "AL_nH": 60,
+      "permeability": 60,
+      "OD_mm": 26.9,
+      "ID_mm": 14.7,
+      "height_mm": 11.2,
+      "datasheet_url": "https://www.mag-inc.com/77083A7"
+    },
+    {
+      "manufacturer": "Magnetics Inc",
+      "part_number": "77439A7",
+      "geometry": "toroid",
+      "material": "Kool Mu",
+      "Ae_cm2": 1.06,
+      "Wa_cm2": 4.27,
+      "Ap_cm4": 4.53,
+      "le_cm": 10.74,
+      "Ve_cm3": 11.4,
+      "AL_nH": 75,
+      "permeability": 60,
+      "OD_mm": 46.7,
+      "ID_mm": 24.1,
+      "height_mm": 18.0,
+      "datasheet_url": "https://www.mag-inc.com/77439A7"
+    },
+    {
+      "manufacturer": "Magnetics Inc",
+      "part_number": "55439A2",
+      "geometry": "toroid",
+      "material": "MPP",
+      "Ae_cm2": 1.06,
+      "Wa_cm2": 4.27,
+      "Ap_cm4": 4.53,
+      "le_cm": 10.74,
+      "Ve_cm3": 11.4,
+      "AL_nH": 157,
+      "permeability": 125,
+      "OD_mm": 46.7,
+      "ID_mm": 24.1,
+      "height_mm": 18.0,
+      "datasheet_url": "https://www.mag-inc.com/55439A2"
+    },
+    {
+      "manufacturer": "Magnetics Inc",
+      "part_number": "58894A2",
+      "geometry": "toroid",
+      "material": "High Flux",
+      "Ae_cm2": 0.654,
+      "Wa_cm2": 2.93,
+      "Ap_cm4": 1.91,
+      "le_cm": 6.35,
+      "Ve_cm3": 4.15,
+      "AL_nH": 160,
+      "permeability": 125,
+      "OD_mm": 26.9,
+      "ID_mm": 14.7,
+      "height_mm": 11.2,
+      "datasheet_url": "https://www.mag-inc.com/58894A2"
+    }
+  ],
+  "ferrite_cores": [
+    {
+      "manufacturer": "Magnetics Inc",
+      "part_number": "43622-UG",
+      "geometry": "UG",
+      "material": "R",
+      "Ae_cm2": 2.04,
+      "Wa_cm2": 4.38,
+      "Ap_cm4": 8.93,
+      "le_cm": 12.0,
+      "Ve_cm3": 24.5,
+      "AL_nH": 4500,
+      "permeability": 2300,
+      "weight_g": 62,
+      "notes": "Planar E equivalent"
+    }
+  ]
+}

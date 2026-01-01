@@ -1,0 +1,68 @@
+{
+  "litz_wires": [
+    {
+      "equivalent_awg": 20,
+      "strand_awg": 38,
+      "strand_count": 60,
+      "outer_diameter_mm": 1.1,
+      "resistance_ohm_m": 0.035,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 18,
+      "strand_awg": 38,
+      "strand_count": 105,
+      "outer_diameter_mm": 1.45,
+      "resistance_ohm_m": 0.022,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 16,
+      "strand_awg": 38,
+      "strand_count": 165,
+      "outer_diameter_mm": 1.8,
+      "resistance_ohm_m": 0.014,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 14,
+      "strand_awg": 38,
+      "strand_count": 260,
+      "outer_diameter_mm": 2.3,
+      "resistance_ohm_m": 0.0088,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 12,
+      "strand_awg": 38,
+      "strand_count": 420,
+      "outer_diameter_mm": 2.9,
+      "resistance_ohm_m": 0.0055,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 10,
+      "strand_awg": 38,
+      "strand_count": 660,
+      "outer_diameter_mm": 3.7,
+      "resistance_ohm_m": 0.0035,
+      "frequency_max_khz": 100
+    },
+    {
+      "equivalent_awg": 20,
+      "strand_awg": 44,
+      "strand_count": 250,
+      "outer_diameter_mm": 1.15,
+      "resistance_ohm_m": 0.036,
+      "frequency_max_khz": 500
+    },
+    {
+      "equivalent_awg": 16,
+      "strand_awg": 44,
+      "strand_count": 600,
+      "outer_diameter_mm": 1.9,
+      "resistance_ohm_m": 0.015,
+      "frequency_max_khz": 500
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "powder_cores": [
+    {
+      "manufacturer": "Micrometals",
+      "part_number": "T106-26",
+      "geometry": "toroid",
+      "material": "Iron Powder -26",
+      "Ae_cm2": 0.659,
+      "Wa_cm2": 1.78,
+      "Ap_cm4": 1.17,
+      "le_cm": 6.85,
+      "Ve_cm3": 4.51,
+      "AL_nH": 93,
+      "permeability": 75,
+      "OD_mm": 26.9,
+      "ID_mm": 14.5,
+      "height_mm": 11.1,
+      "datasheet_url": "https://micrometals.com/T106-26"
+    },
+    {
+      "manufacturer": "Micrometals",
+      "part_number": "T200-52",
+      "geometry": "toroid",
+      "material": "Iron Powder -52",
+      "Ae_cm2": 1.27,
+      "Wa_cm2": 7.30,
+      "Ap_cm4": 9.27,
+      "le_cm": 13.0,
+      "Ve_cm3": 16.5,
+      "AL_nH": 92,
+      "permeability": 75,
+      "OD_mm": 50.8,
+      "ID_mm": 31.8,
+      "height_mm": 14.0,
+      "datasheet_url": "https://micrometals.com/T200-52"
+    },
+    {
+      "manufacturer": "Micrometals",
+      "part_number": "T400-2",
+      "geometry": "toroid",
+      "material": "Iron Powder -2",
+      "Ae_cm2": 4.80,
+      "Wa_cm2": 26.4,
+      "Ap_cm4": 126.7,
+      "le_cm": 26.0,
+      "Ve_cm3": 125,
+      "AL_nH": 23,
+      "permeability": 10,
+      "OD_mm": 102,
+      "ID_mm": 57.2,
+      "height_mm": 16.5,
+      "datasheet_url": "https://micrometals.com/T400-2"
+    }
+  ]
+}
