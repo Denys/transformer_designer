@@ -13,7 +13,7 @@ Features:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import transformer, inductor, openmagnetics, export, pulse_transformer
+from routers import transformer, inductor, openmagnetics, export, pulse_transformer, psfb_transformer
 
 app = FastAPI(
     title="Power Transformer Designer",
@@ -58,6 +58,7 @@ app.include_router(inductor.router)
 app.include_router(openmagnetics.router)
 app.include_router(export.router)
 app.include_router(pulse_transformer.router)
+app.include_router(psfb_transformer.router)
 
 
 @app.get("/health")

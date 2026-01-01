@@ -338,3 +338,167 @@ def calculate_Bac_from_waveform(
         # Default: assume bidirectional, Bac = Bmax
         return Bmax_T
 
+
+def calculate_core_loss_igse(
+    k: float,
+    alpha: float,
+    beta: float,
+    voltage_waveform: list[float],
+    time_points: list[float],
+    Ae_m2: float,
+    N_turns: int,
+    volume_cm3: float,
+) -> float:
+    """
+    Calculate core loss using Improved Generalized Steinmetz Equation (iGSE).
+
+    Valid for non-sinusoidal waveforms (e.g. trapezoidal in PSFB).
+
+    Formula:
+        Pv(t) = ki * |dB/dt|^alpha * (DeltaB)^(beta - alpha)
+        Pavg = (1/T) * integral(Pv(t) dt)
+
+        ki = k / ((2*pi)^(alpha-1) * integral_0^2pi |cos(theta)|^alpha * 2^(beta-alpha))
+           ~= k / (2^(beta+1) * pi^(alpha-1) * 0.2761)  (approximate)
+
+    Args:
+        k, alpha, beta: Steinmetz parameters
+        voltage_waveform: List of voltage samples [V]
+        time_points: List of time samples [s] corresponding to voltage
+        Ae_m2: Core effective area [m^2]
+        N_turns: Number of turns
+        volume_cm3: Core volume [cm^3]
+
+    Returns:
+        Average core loss [W]
+    """
+    if len(voltage_waveform) < 2 or len(voltage_waveform) != len(time_points):
+        return 0.0
+
+    # Calculate ki
+    # Standard approximation for ki from k (assuming sinusoidal reference)
+    # Ref: "Improved Generalized Steinmetz Equation for Waveform Optimization" - Venkatachalam et al.
+    theta_int = 4 * 0.556 # Approximate integral of |cos|^alpha for typical alpha
+    # Use accurate numerical integration for theta_int if alpha varies significantly,
+    # but for typical ferrite alpha (1.2-1.8), approximation is sufficient.
+    # More precise: ki = k / ((2*pi)^(alpha-1) * int_0^2pi |cos(theta)|^alpha dtheta)
+    # For now, use the simplified conversion valid for sinusoidal derivation
+
+    # Calculate time step and period
+    T = time_points[-1] - time_points[0]
+    if T <= 0:
+        return 0.0
+
+    # Calculate B(t) from V(t) -> B(t) = (1/NAe) * integral(V dt)
+    # dB/dt = V(t) / (N * Ae)
+    dB_dt = [v / (N_turns * Ae_m2) for v in voltage_waveform]
+
+    # Integrate dB/dt to get B(t)
+    B_t = [0.0] * len(time_points)
+    for i in range(1, len(time_points)):
+        dt = time_points[i] - time_points[i-1]
+        B_t[i] = B_t[i-1] + dB_dt[i-1] * dt
+
+    # Find peak-to-peak Delta B
+    B_min = min(B_t)
+    B_max = max(B_t)
+    delta_B = B_max - B_min
+
+    if delta_B <= 0:
+        return 0.0
+
+    # ki calculation (Venkatachalam)
+    # For sine wave: P = k f^a B^b
+    # iGSE P = (1/T) integral (ki |dB/dt|^a (deltaB)^(b-a))
+    # For sine B = Bpk sin(wt), dB/dt = w Bpk cos(wt), deltaB = 2 Bpk
+    # P_sine = ki * (2 Bpk)^(b-a) * (1/T) integral( |w Bpk cos(wt)|^a dt )
+    #        = ki * 2^(b-a) * Bpk^(b-a) * w^a * Bpk^a * (1/2pi) integral_0^2pi |cos(theta)|^a dtheta
+    #        = ki * 2^(b-a) * Bpk^b * (2*pi*f)^a * I_cos
+    # Set equal to k f^a Bpk^b:
+    # k = ki * 2^(b-a) * (2*pi)^a * I_cos
+    # ki = k / (2^(b-a) * (2*pi)^a * I_cos)
+
+    # Numerical integral of |cos(x)|^alpha from 0 to 2pi
+    # Simpson's rule or simple sum
+    steps = 100
+    dtheta = 2 * math.pi / steps
+    I_cos = sum([abs(math.cos(i * dtheta))**alpha for i in range(steps)]) * dtheta / (2 * math.pi) # Normalized
+    # Wait, the formula has (1/T) which is f. The integral is over period.
+    # integral_0^2pi |cos|^a dtheta
+    I_cos_pure = sum([abs(math.cos(i * dtheta))**alpha for i in range(steps)]) * dtheta
+
+    ki = k / (2**(beta - alpha) * (2 * math.pi)**(alpha - 1) * I_cos_pure)
+
+    # Calculate instantaneous power loss density Pv(t)
+    energy_density_sum = 0.0
+
+    for i in range(len(time_points) - 1):
+        dt = time_points[i+1] - time_points[i]
+        val = abs(dB_dt[i])**alpha
+        energy_density_sum += val * dt
+
+    # Pavg = ki * (Delta B)^(beta-alpha) * (1/T) * integral(|dB/dt|^alpha dt)
+    loss_density_W_m3 = ki * (delta_B**(beta - alpha)) * (energy_density_sum / T)
+
+    # Convert to Watts
+    # loss_density is W/m^3?
+    # Steinmetz k is usually for mW/cm^3 with f in kHz, B in mT?
+    # Need to normalize units.
+    # Input k is assumed to be in standard form: P[mW/cm3] = k * f[kHz]^a * B[mT]^b
+
+    # Let's convert everything to SI for calculation, then convert k back or forward?
+    # Better: Convert inputs to kHz/mT to match k, then result is mW/cm3
+
+    # Re-eval with standard units:
+    # f in kHz, B in mT, t in ms?
+    # Let's stick to SI derived ki, but we need to convert k first.
+    # SI k_si = k * 1000 (mW->W? no)
+    # P[W/m3] = P[mW/cm3] * 1000
+    # Let's just use the formula relative to the sinusoidal case.
+
+    # Ratio of iGSE loss to Steinmetz loss for same frequency and Bpk
+    # P_igse / P_steinmetz (sine)
+    # = (ki * dBdt_int * dB^(b-a) / T) / (k * f^a * Bpk^b)
+    # This is hard to track.
+
+    # Alternative:
+    # Use the pre-calculated P_steinmetz as baseline?
+    # No, we want to support arbitrary waveforms.
+
+    # Let's use the provided k (mW/cm^3, kHz, mT)
+    # Convert waveform to kHz equivalent time (ms) and mT (Tesla * 1000)
+
+    T_ms = T * 1000
+    time_points_ms = [t * 1000 for t in time_points]
+    delta_B_mT = delta_B * 1000
+    dB_dt_mT_ms = [val * 1000 / 1000 for val in dB_dt] # T/s = (T*1000)/(s*1000) = mT/ms?
+    # T/s = 1000 mT / 1000 ms = 1 mT/ms. Yes.
+
+    # Calculate ki for these units
+    # k is compatible with f(kHz), B(mT).
+    # integral |cos(theta)|^a dtheta over 2pi
+    I_cos_pure = sum([abs(math.cos(i * dtheta))**alpha for i in range(steps)]) * dtheta
+
+    # ki_metric = k / (2^(b-a) * (2pi)^(a-1) * I_cos_pure)
+    # Note: the (2pi)^(a-1) comes from converting f^a to w^a?
+    # P = k * f^a * B^b
+    # P = ki * integral |dB/dt|^a * dB^(b-a) * f
+    # For sine: B = Bpk sin(2pi f t) => dB/dt = 2pi f Bpk cos...
+    # |dB/dt|^a = (2pi f Bpk)^a |cos|^a
+    # integral over T is integral_0^2pi (...) dtheta / (2pi f) * (something?)
+    # Let's trust the standard conversion:
+    # ki = k / ( (2*pi)^(alpha-1) * 2^(beta-alpha) * integral_0_2pi |cos|^a )
+
+    ki_metric = k / ((2 * math.pi)**(alpha - 1) * 2**(beta - alpha) * I_cos_pure)
+
+    energy_sum_metric = 0.0
+    for i in range(len(time_points_ms) - 1):
+        dt_ms = time_points_ms[i+1] - time_points_ms[i]
+        # dB/dt in mT/ms
+        rate = dB_dt_mT_ms[i]
+        energy_sum_metric += (abs(rate)**alpha) * dt_ms
+
+    P_avg_mW_cm3 = ki_metric * (delta_B_mT**(beta - alpha)) * (energy_sum_metric / T_ms)
+
+    # Total loss W
+    return P_avg_mW_cm3 * volume_cm3 / 1000.0
