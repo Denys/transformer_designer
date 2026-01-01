@@ -20,6 +20,8 @@ from integrations.mas_exporter import (
     export_design_to_mas,
     export_design_to_femm,
 )
+from integrations.pdf_exporter import PDFExporter
+from integrations.svg_exporter import SVGExporter
 
 
 router = APIRouter(prefix="/api/export", tags=["export"])
@@ -267,6 +269,79 @@ async def download_design_json(request: TransformerExportRequest):
         )
 
 
+@router.post("/pdf/download")
+async def download_pdf_report(request: TransformerExportRequest):
+    """
+    Download design report as PDF.
+    """
+    try:
+        exporter = PDFExporter()
+        pdf_content = exporter.create_pdf_report(
+            design_result=request.design_result,
+            requirements=request.requirements
+        )
+
+        # Generate filename
+        core_name = request.design_result.get('core', {}).get('part_number', 'unknown')
+
+        # Determine filename based on design type
+        if 'pulse_width_us' in request.requirements or 'volt_second_uVs' in request.design_result:
+            vs = request.design_result.get('volt_second_uVs', 0)
+            filename = f"pulse_transformer_report_{core_name}.pdf"
+        else:
+            power = request.requirements.get('output_power_W', 0)
+            filename = f"transformer_report_{core_name}_{int(power)}W.pdf"
+
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF export failed: {str(e)}"
+        )
+
+
+@router.post("/svg/download")
+async def download_svg_diagram(request: TransformerExportRequest):
+    """
+    Download winding cross-section as SVG.
+    """
+    try:
+        exporter = SVGExporter()
+        svg_content = exporter.generate_winding_cross_section(
+            design_result=request.design_result,
+            requirements=request.requirements
+        )
+
+        # Generate filename
+        core_name = request.design_result.get('core', {}).get('part_number', 'unknown')
+        filename = f"winding_diagram_{core_name}.svg"
+
+        return Response(
+            content=svg_content,
+            media_type="image/svg+xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"SVG export failed: {str(e)}"
+        )
+
+
 @router.get("/formats")
 async def get_export_formats():
     """
@@ -301,8 +376,8 @@ async def get_export_formats():
                 "id": "pdf",
                 "name": "PDF Report",
                 "extension": ".pdf",
-                "description": "Printable design report (coming soon)",
-                "available": False,
+                "description": "Printable design report",
+                "available": True,
             },
             {
                 "id": "step",
