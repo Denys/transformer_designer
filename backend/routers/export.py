@@ -241,8 +241,16 @@ async def download_design_json(request: TransformerExportRequest):
         
         # Generate filename
         core_name = request.design_result.get('core', {}).get('part_number', 'unknown')
-        power = request.requirements.get('output_power_W', 0)
-        filename = f"transformer_design_{core_name}_{int(power)}W.json"
+
+        # Determine filename based on design type (Power or Pulse)
+        if 'pulse_width_us' in request.requirements or 'volt_second_uVs' in request.design_result:
+            # Pulse transformer
+            vs = request.design_result.get('volt_second_uVs', 0)
+            filename = f"pulse_transformer_{core_name}_{int(vs)}uVs.json"
+        else:
+            # Power transformer
+            power = request.requirements.get('output_power_W', 0)
+            filename = f"transformer_design_{core_name}_{int(power)}W.json"
         
         return Response(
             content=json_content,
