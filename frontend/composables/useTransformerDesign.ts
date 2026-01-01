@@ -405,16 +405,44 @@ export function useTransformerDesign() {
         error.value = null
     }
 
-    /** Export design to various formats (placeholder for future implementation) */
+    /** Export design to various formats */
     async function exportDesign(format: 'mas' | 'pdf' | 'json'): Promise<Blob | null> {
         if (!result.value) {
             error.value = 'No design to export'
             return null
         }
         
-        // TODO: Implement export endpoints
-        console.log(`Export to ${format} not yet implemented`)
-        return null
+        try {
+            const endpointMap = {
+                'mas': '/api/export/mas/download',
+                'pdf': '/api/export/pdf/download',
+                'json': '/api/export/json/download'
+            }
+
+            const response = await fetch(`${API_BASE}${endpointMap[format]}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    design_result: result.value,
+                    requirements: requirements.value,
+                    pretty: true,
+                    include_metadata: true
+                }),
+            })
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}))
+                throw new Error(errData.detail || `HTTP ${response.status} during export`)
+            }
+
+            return await response.blob()
+        } catch (e) {
+            console.error(`Export to ${format} failed:`, e)
+            error.value = e instanceof Error ? e.message : 'Export failed'
+            return null
+        }
     }
 
     return {

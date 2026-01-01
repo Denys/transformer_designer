@@ -20,6 +20,7 @@ from integrations.mas_exporter import (
     export_design_to_mas,
     export_design_to_femm,
 )
+from integrations.pdf_exporter import PDFExporter
 
 
 router = APIRouter(prefix="/api/export", tags=["export"])
@@ -259,6 +260,41 @@ async def download_design_json(request: TransformerExportRequest):
         )
 
 
+@router.post("/pdf/download")
+async def download_pdf_report(request: TransformerExportRequest):
+    """
+    Download PDF design report.
+
+    Generates a printable PDF report with all design details,
+    core specifications, winding parameters, and analysis results.
+    """
+    try:
+        exporter = PDFExporter()
+        pdf_content = exporter.export_pdf(
+            design_result=request.design_result,
+            requirements=request.requirements,
+        )
+
+        # Generate filename
+        core_name = request.design_result.get('core', {}).get('part_number', 'unknown')
+        power = request.requirements.get('output_power_W', 0)
+        filename = f"transformer_report_{core_name}_{int(power)}W.pdf"
+
+        return Response(
+            content=pdf_content,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"PDF generation failed: {str(e)}"
+        )
+
+
 @router.get("/formats")
 async def get_export_formats():
     """
@@ -293,8 +329,8 @@ async def get_export_formats():
                 "id": "pdf",
                 "name": "PDF Report",
                 "extension": ".pdf",
-                "description": "Printable design report (coming soon)",
-                "available": False,
+                "description": "Printable design report",
+                "available": True,
             },
             {
                 "id": "step",
