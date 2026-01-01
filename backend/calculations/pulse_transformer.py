@@ -322,10 +322,14 @@ def analyze_pulse_response(
     load_resistance_ohm: float,
     pulse_voltage_V: float,
     pulse_width_us: float,
+    load_inductance_nH: float = 0.0,
+    load_capacitance_pF: float = 0.0,
 ) -> PulseResponse:
     """
     Complete pulse response analysis.
     
+    Supports complex loads (R-L, R-C) via analytical approximations.
+
     Args:
         magnetizing_inductance_uH: Magnetizing inductance [µH]
         leakage_inductance_nH: Leakage inductance [nH]
@@ -333,6 +337,8 @@ def analyze_pulse_response(
         load_resistance_ohm: Load resistance [Ω]
         pulse_voltage_V: Pulse voltage [V]
         pulse_width_us: Pulse width [µs]
+        load_inductance_nH: Load inductance [nH]
+        load_capacitance_pF: Load capacitance [pF]
         
     Returns:
         PulseResponse analysis
@@ -342,36 +348,71 @@ def analyze_pulse_response(
     Llk = leakage_inductance_nH * 1e-9      # H
     Cw = winding_capacitance_pF * 1e-12     # F
     t_pulse = pulse_width_us * 1e-6         # s
+    L_load = load_inductance_nH * 1e-9      # H
+    C_load = load_capacitance_pF * 1e-12    # F
+
+    # Effective load inductance (adds to leakage for rise time)
+    L_total_rise = Llk + L_load
+
+    # Effective capacitance (winding + load)
+    C_total = Cw + C_load
     
-    # Rise/fall time
-    rise_time = calculate_rise_time(Llk, load_resistance_ohm, Cw)
-    fall_time = rise_time * 1.1  # Fall typically slightly slower
+    # Rise/fall time with complex load
+    # If L_load is significant, it dominates rise time (L/R)
+    # If C_load is significant, it dominates rise time (RC)
+
+    # 1. Inductive Rise Time (L_total / R)
+    tau_LR = L_total_rise / load_resistance_ohm
+    tr_LR = 2.2 * tau_LR
+
+    # 2. Capacitive Rise Time (R * C_total) - if source impedance is low?
+    # Actually, leakage inductance forms resonant circuit with C_total
+    # LC rise time
+    if C_total > 0:
+        tr_LC = math.pi * math.sqrt(L_total_rise * C_total)
+    else:
+        tr_LC = 0
+
+    # 3. RC Rise time (if leakage is small but C_load large)
+    # This usually happens if source impedance is not zero, but here we assume ideal source driving transformer.
+    # The transformer leakage is the source impedance.
+
+    rise_time = max(tr_LR, tr_LC)
+    fall_time = rise_time * 1.1
     
     # Droop
+    # Load inductance helps maintain current -> less droop initially?
+    # No, droop is Lm issue.
+    # If C_load is large, it holds voltage -> less droop?
+    # Generally droop is dominated by Lm.
     droop = calculate_droop(Lm, load_resistance_ohm, t_pulse)
     
     # Backswing
-    V_back, f_ring = calculate_backswing(Lm, Llk, Cw, pulse_voltage_V, t_pulse)
+    V_back, f_ring = calculate_backswing(Lm, Llk, Cw, pulse_voltage_V, t_pulse) # Use Cw for ringing, load C might dampen or lower freq
+
+    if C_total > Cw:
+        # Adjust ringing frequency for total capacitance
+        f_ring = 1 / (2 * math.pi * math.sqrt(Lm * C_total))
+        # Backswing voltage might be lower
+        Z0_new = math.sqrt(Lm / C_total)
+        I_mag = pulse_voltage_V * t_pulse / Lm
+        V_back = I_mag * Z0_new
+
     backswing_percent = (V_back / pulse_voltage_V) * 100 if pulse_voltage_V > 0 else 0
     
-    # Bandwidth (from rise time)
-    # BW ≈ 0.35 / tr
+    # Bandwidth
     bandwidth_Hz = 0.35 / rise_time if rise_time > 0 else 1e9
     
     # Damping factor and overshoot
-    # Q < 0.5: overdamped, no overshoot
-    # Q = 0.5: critically damped
-    # Q > 0.5 and Q < 1: underdamped with overshoot
-    # Q >= 1: very underdamped (high overshoot, use limiting form)
-    if Llk > 0 and Cw > 0:
-        Q = (1 / load_resistance_ohm) * math.sqrt(Llk / Cw)
+    # Use total L and C
+    if L_total_rise > 0 and C_total > 0:
+        Q = (1 / load_resistance_ohm) * math.sqrt(L_total_rise / C_total)
         if Q < 0.5:
             overshoot = 0
         elif Q < 1:
             overshoot = math.exp(-math.pi * Q / math.sqrt(1 - Q**2)) * 100
         else:
-            # Q >= 1: very underdamped, overshoot approaches 100%
-            overshoot = 100 * (1 - 1/Q)  # Approximate
+            overshoot = 100 * (1 - 1/Q)
     else:
         overshoot = 0
     
@@ -383,6 +424,119 @@ def analyze_pulse_response(
         bandwidth_3dB_MHz=round(bandwidth_Hz / 1e6, 3),
         ringing_freq_MHz=round(f_ring / 1e6, 3) if f_ring > 0 else None,
         overshoot_percent=round(overshoot, 2),
+    )
+
+
+# ============================================================================
+# Energy Transfer Analysis
+# ============================================================================
+
+@dataclass
+class EnergyTransferResult:
+    """Energy transfer efficiency result."""
+    efficiency_percent: float
+    energy_input_J: float
+    energy_transferred_J: float
+    energy_loss_J: float
+    peak_current_A: float
+    transfer_time_us: float
+
+
+def calculate_energy_transfer_efficiency(
+    primary_capacitance_F: float,
+    primary_voltage_V: float,
+    secondary_capacitance_F: float,
+    leakage_inductance_H: float,
+    primary_resistance_ohm: float,
+    secondary_resistance_ohm: float,
+    turns_ratio: float = 1.0,
+    magnetizing_inductance_H: Optional[float] = None,
+) -> EnergyTransferResult:
+    """
+    Calculate energy transfer efficiency for resonant charging.
+
+    Assumes a C-L-C resonant transfer where the primary capacitor
+    discharges into the secondary capacitor through the transformer
+    leakage inductance (and any external inductance).
+
+    Efficiency is limited by series resistance and magnetizing current losses.
+
+    Args:
+        primary_capacitance_F: Primary storage capacitance [F]
+        primary_voltage_V: Initial primary voltage [V]
+        secondary_capacitance_F: Secondary load capacitance [F]
+        leakage_inductance_H: Total series inductance referred to primary [H]
+        primary_resistance_ohm: Primary series resistance [Ω]
+        secondary_resistance_ohm: Secondary series resistance [Ω]
+        turns_ratio: Transformer turns ratio (Nsec/Npri)
+        magnetizing_inductance_H: Magnetizing inductance referred to primary [H]
+
+    Returns:
+        EnergyTransferResult
+    """
+    # Reflect secondary values to primary side
+    C_sec_ref = secondary_capacitance_F * (turns_ratio ** 2)
+    R_sec_ref = secondary_resistance_ohm / (turns_ratio ** 2)
+    R_total = primary_resistance_ohm + R_sec_ref
+
+    # Equivalent series capacitance
+    if primary_capacitance_F + C_sec_ref > 0:
+        C_eq = (primary_capacitance_F * C_sec_ref) / (primary_capacitance_F + C_sec_ref)
+    else:
+        return EnergyTransferResult(0, 0, 0, 0, 0, 0)
+
+    # Resonance frequency and characteristic impedance
+    if leakage_inductance_H > 0 and C_eq > 0:
+        omega = 1.0 / math.sqrt(leakage_inductance_H * C_eq)
+        Z0 = math.sqrt(leakage_inductance_H / C_eq)
+
+        # Transfer time (half period)
+        t_transfer = math.pi / omega
+    else:
+        return EnergyTransferResult(0, 0, 0, 0, 0, 0)
+
+    # Initial energy
+    E_in = 0.5 * primary_capacitance_F * (primary_voltage_V ** 2)
+
+    # Peak current (undamped approximation)
+    # I_peak = V_pri / Z0
+    # Ideally should account for damping, but for high efficiency designs Z0 >> R
+    I_peak = primary_voltage_V / Z0
+
+    # Resistive Energy loss approximation: E_loss = integral(I^2 * R * dt)
+    # I(t) = I_peak * sin(omega * t)
+    # integral(sin^2) from 0 to pi = pi/2
+    # Energy loss = I_peak^2 * R * (pi / (2 * omega))
+    #             = I_peak^2 * R * t_transfer / 2
+
+    E_resistive = (I_peak ** 2) * R_total * t_transfer / 2
+
+    # Magnetizing Energy Loss (Trapped energy)
+    # Estimate volt-seconds during transfer
+    # V_L_mag approx sinusoidal half-wave. Average voltage V_avg = 2/pi * V_peak
+    # But V_pri drops. Let's approximate effective Volt-Seconds as V_pri * t_transfer * 0.637
+    E_mag = 0.0
+    if magnetizing_inductance_H and magnetizing_inductance_H > 0:
+        Vt_eff = primary_voltage_V * t_transfer * 0.637
+        I_mag_peak = Vt_eff / magnetizing_inductance_H
+        E_mag = 0.5 * magnetizing_inductance_H * (I_mag_peak ** 2)
+
+    total_loss = E_resistive + E_mag
+
+    # Cap loss to available energy
+    if total_loss > E_in:
+        total_loss = E_in
+
+    E_out = E_in - total_loss
+    efficiency = (E_out / E_in) * 100 if E_in > 0 else 0
+
+    return EnergyTransferResult(
+        efficiency_percent=round(efficiency, 2),
+        energy_input_J=round(E_in, 4),
+        energy_transferred_J=round(E_out, 4),
+        energy_loss_J=round(total_loss, 4),
+        peak_current_A=round(I_peak, 2),
+        transfer_time_us=round(t_transfer * 1e6, 3)
     )
 
 
