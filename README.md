@@ -48,23 +48,28 @@ A full-stack web application for designing power transformers, inductors, and pu
    cd transformer_designer
    ```
 
-2. **Backend Setup**
+2. **Docker Deployment (Recommended)**
+   Build and run the entire stack using Docker Compose:
+   ```bash
+   docker-compose up --build
+   ```
+   - Frontend: http://localhost:3000
+   - Backend API: http://localhost:8000
+   - API Docs: http://localhost:8000/docs
+
+3. **Manual Backend Setup**
    ```bash
    cd backend
    uv sync
    uv run uvicorn main:app --host 127.0.0.1 --port 8000 --reload
    ```
-   
-   API documentation available at: http://localhost:8000/docs
 
-3. **Frontend Setup** (in a new terminal)
+4. **Manual Frontend Setup**
    ```bash
    cd frontend
    npm install
    npm run dev
    ```
-   
-   Web interface available at: http://localhost:3000
 
 ## 📁 Project Structure
 
